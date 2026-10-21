@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#101713" />
+  <title>Fútbol Central — marcadores y estadísticas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="components.css" />
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#inicio" aria-label="Fútbol Central, inicio"><span class="brand-mark">FC</span><span>fútbol<span class="brand-light">central</span></span></a>
+      <div class="side-label">MENÚ</div>
+      <nav class="side-nav" aria-label="Navegación principal">
+        <button class="nav-item active" data-view="resultados"><span class="nav-icon">◉</span>Marcadores</button>
+        <button class="nav-item" data-view="calendario"><span class="nav-icon">▦</span>Calendario</button>
+        <button class="nav-item" data-view="estadisticas"><span class="nav-icon">▥</span>Estadísticas</button>
+      </nav>
+      <div class="side-label leagues-label">COMPETICIONES</div>
+      <div class="league-links">
+        <button class="league-link selected" data-league="Todas"><i class="league-ball">⚽</i>Todas</button>
+        <button class="league-link" data-league="LaLiga"><img class="league-logo logo-img" src="https://assets.footylogos.com/previews/laliga-spain/laliga-spain-logo-footylogos-320.webp" alt="">LaLiga</button>
+        <button class="league-link" data-league="Premier League"><img class="league-logo logo-img" src="https://assets.footylogos.com/previews/premier-league-england/premier-league-england-logo-footylogos-320.webp" alt="">Premier League</button>
+        <button class="league-link" data-league="Bundesliga"><img class="league-logo logo-img" src="https://assets.footylogos.com/previews/bundesliga-germany/bundesliga-germany-logo-footylogos-320.webp" alt="">Bundesliga</button>
+        <button class="league-link" data-league="Serie A"><img class="league-logo logo-img" src="https://assets.footylogos.com/previews/serie-a-italy/serie-a-italy-logo-footylogos-320.webp" alt="">Serie A</button>
+      </div>
+        <div class="sidebar-bottom"><div class="live-dot"></div><span>OpenFootball</span><small>DATOS DE GITHUB · JSON</small></div>
+    </aside>
+
+    <main class="main-content" id="inicio">
+      <header class="topbar">
+        <button class="mobile-brand" aria-label="Fútbol Central">FC</button>
+        <div class="breadcrumb">FÚTBOL <span>/</span> <b id="crumb">MARCADORES</b></div>
+        <div class="top-actions"><label class="search-box"><span>⌕</span><input id="search" type="search" placeholder="Buscar equipo o competición" aria-label="Buscar equipo o competición"><kbd>⌘ K</kbd></label><button class="avatar" title="Perfil">DJ</button></div>
+      </header>
+
+      <div class="content-wrap">
+        <section class="welcome-row">
+          <div><p class="eyebrow"><span class="eyebrow-line"></span>DATOS ABIERTOS DE FÚTBOL</p><h1 id="page-title">El fútbol, <em>en contexto.</em></h1><p class="subtitle" id="page-subtitle">Sigue los marcadores, descubre los próximos partidos y explora las estadísticas.</p></div>
+          <div class="date-pill"><span class="calendar-icon">▦</span><span id="today-date"></span></div>
+        </section>
+
+        <section class="data-notice"><span class="notice-icon">i</span><div><strong>Calendario OpenFootball · resultados Football-Data.co.uk</strong><span>Los marcadores se contrastan con Football-Data.co.uk y la clasificación se calcula con sus resultados. <a href="https://github.com/openfootball/football.json" target="_blank" rel="noreferrer">OpenFootball ↗</a> · <a href="https://www.football-data.co.uk/" target="_blank" rel="noreferrer">Football-Data.co.uk ↗</a></span></div><button id="dismiss-notice" aria-label="Cerrar aviso">×</button></section>
+        <section class="import-panel" aria-label="Conexión de datos"><div class="import-top"><div><span class="panel-kicker">DATOS DE COMPETICIÓN</span><h3>Actualización automática</h3></div><select class="select-control" id="data-league" aria-label="Competición"><option>LaLiga</option><option>Premier League</option><option>Serie A</option><option>Bundesliga</option></select></div><p id="import-status" class="import-status">Conectando con el calendario y los resultados…</p></section>
+
+        <div class="toolbar">
+          <div class="tabs" role="tablist" aria-label="Secciones"><button class="tab active" data-view="resultados" role="tab">Resultados <span class="tab-count">6</span></button><button class="tab" data-view="calendario" role="tab">Calendario</button><button class="tab" data-view="estadisticas" role="tab">Estadísticas</button></div>
+          <div class="date-controls"><button id="prev-day" class="icon-button" aria-label="Día anterior">‹</button><button id="date-label" class="date-select">Hoy <span>▾</span></button><button id="next-day" class="icon-button" aria-label="Día siguiente">›</button></div>
+        </div>
+
+        <section class="view-panel" id="results-view">
+          <div class="section-heading"><div><span class="live-tag"><i></i>JORNADA</span><h2>Partidos destacados</h2></div><button class="text-button" id="show-all">Ver todos <span>→</span></button></div>
+          <div class="match-grid" id="match-grid"></div>
+          <div class="lower-grid">
+            <section class="panel standings-panel"><div class="panel-heading"><div><span class="panel-kicker">CLASIFICACIÓN</span><h3>Clasificación completa</h3></div><button class="more-button" aria-label="Más opciones">•••</button></div><div id="standings-legend" class="standings-legend"></div><div class="table-head"><span>#</span><span>Equipo</span><span>PJ</span><span>G</span><span>E</span><span>P</span><span>DG</span><span>Pts</span></div><div id="standings"></div></section>
+            <section class="panel scorers-panel"><div class="panel-heading"><div><span class="panel-kicker">TEMPORADA 2026/27</span><h3>Equipos más goleadores</h3></div><button class="text-button compact" data-view="estadisticas">Ver tabla →</button></div><div id="scorers"></div></section>
+          </div>
+          <footer class="page-footer">Calendario: <a href="https://github.com/openfootball/football.json" target="_blank" rel="noreferrer">OpenFootball</a> · Resultados y clasificación: <a href="https://www.football-data.co.uk/" target="_blank" rel="noreferrer">Football-Data.co.uk</a> · Escudos: <a href="https://www.footylogos.com/es" target="_blank" rel="noreferrer">FootyLogos</a>.</footer>
+        </section>
+
+        <section class="view-panel hidden" id="calendar-view"><div class="section-heading"><div><span class="live-tag"><i></i>PRÓXIMOS PARTIDOS</span><h2>Calendario</h2></div></div><div id="calendar-list" class="calendar-list"></div></section>
+        <section class="view-panel hidden" id="stats-view"><div class="section-heading"><div><span class="live-tag"><i></i>DATOS IMPORTADOS</span><h2>Estadísticas de la competición</h2></div><select class="select-control" id="stats-league" aria-label="Competición"><option>LaLiga</option><option>Premier League</option><option>Serie A</option><option>Bundesliga</option></select></div><div class="stats-cards" id="stats-cards"></div><div class="lower-grid stats-lower"><section class="panel"><div class="panel-heading"><div><span class="panel-kicker">GOLES</span><h3 id="scorer-heading">Goleadores</h3></div></div><div id="scorers-full"></div></section><section class="panel"><div class="panel-heading"><div><span class="panel-kicker">RENDIMIENTO</span><h3>Equipos destacados</h3></div></div><div id="team-stats"></div></section></div></section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
