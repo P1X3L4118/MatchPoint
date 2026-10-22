@@ -94,7 +94,8 @@ function renderStandings(league) {
     if (zone.key) categories.set(zone.key, zone);
     const leader = index === 0;
     const label = leader ? (zone.label ? `Líder · ${zone.label}` : "Líder") : zone.label;
-    return `<div class="standing-row ${zone.key ? `zone-${zone.key}` : ""} ${leader ? "is-leader" : ""}" title="${esc(label || "")}"><span class="rank-cell">${esc(row.rank)}</span><span class="standing-club">${teamImage(row.id, row.name, true)}<span>${esc(row.shortName || row.name)}</span></span><span>${esc(row.played)}</span><span class="goal-diff ${Number(row.gd) > 0 ? "positive" : Number(row.gd) < 0 ? "negative" : ""}">${Number(row.gd) > 0 ? "+" : ""}${esc(row.gd)}</span><b class="points-cell">${esc(row.points)}</b></div>${label ? `<div class="zone-caption ${leader ? "leader-caption" : ""}"><span style="--zone-color:${esc(zone.color || "#b9f36b")}"></span>${esc(label)}</div>` : ""}`;
+    const markerColor = zone.color || (leader ? "#b9f36b" : "transparent");
+    return `<div class="standing-row ${zone.key ? `zone-${zone.key}` : ""} ${leader ? "is-leader" : ""}" style="--zone-color:${esc(markerColor)}" title="${esc(label || "")}"><span class="rank-cell">${esc(row.rank)}</span><span class="standing-club">${teamImage(row.id, row.name, true)}<span>${esc(row.shortName || row.name)}</span></span><span>${esc(row.played)}</span><span class="goal-diff ${Number(row.gd) > 0 ? "positive" : Number(row.gd) < 0 ? "negative" : ""}">${Number(row.gd) > 0 ? "+" : ""}${esc(row.gd)}</span><b class="points-cell">${esc(row.points)}</b></div>`;
   }).join("");
   $("#standings").innerHTML = html;
   const order = ["champions", "conference", "europa", "relegation"];
@@ -173,4 +174,3 @@ $("#match-date").addEventListener("change", (event) => { if (event.target.value)
 $("#refresh").addEventListener("click", refresh);
 refresh();
 setInterval(refresh, 60_000);
-
