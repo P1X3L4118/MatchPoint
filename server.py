@@ -139,14 +139,35 @@ def normalize_player_stats(payload: dict) -> tuple[list[dict], list[dict]]:
             target = assists
         else:
             continue
-        for player in stat.get("topThree") or []:
+        players = stat.get("topThree") or []
+        full_list_url = stat.get("fetchAllUrl")
+        if full_list_url:
+            try:
+                full_list = fotmob_json(full_list_url)
+                top_lists = (full_list.get("TopLists") or []) if isinstance(full_list, dict) else []
+                complete = next((item.get("StatList") for item in top_lists if item.get("StatList")), [])
+                if complete:
+                    players = complete[:5]
+            except Exception:
+                # Conserva los líderes del endpoint principal si falla la lista ampliada.
+                pass
+        for player in players[:5]:
+            player_id = player.get("id") or player.get("ParticipantId") or player.get("ParticiantId")
+            name = player.get("name") or player.get("ParticipantName", "")
+            value = player.get("value")
+            if value is None:
+                value = player.get("StatValue") or 0
+            if isinstance(value, dict):
+                value = value.get("value", 0)
+            if isinstance(value, float) and value.is_integer():
+                value = int(value)
             target.append({
-                "id": player.get("id"), "name": player.get("name", ""),
-                "team": player.get("teamName", ""), "teamId": player.get("teamId"),
-                "value": player.get("value", 0), "rank": player.get("rank", 0),
+                "id": player_id, "name": name,
+                "team": player.get("teamName") or player.get("TeamName", ""),
+                "teamId": player.get("teamId") or player.get("TeamId"),
+                "value": value, "rank": player.get("rank") or player.get("Rank", 0),
             })
     return scorers, assists
-
 
 def fetch_all_data(force: bool = False) -> dict:
     global _cache
