@@ -10,7 +10,7 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&
 const initials = (name) => String(name || "?").trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
 const teamLogo = (id) => `https://images.fotmob.com/image_resources/logo/teamlogo/${encodeURIComponent(id)}.png`;
 const leagueLogo = (id) => `https://images.fotmob.com/image_resources/logo/leaguelogo/${encodeURIComponent(id)}.png`;
-const playerPhoto = (id) => `https://images.fotmob.com/image_resources/playerImages/${encodeURIComponent(id)}.png`;
+const playerPhoto = (id) => `https://images.fotmob.com/image_resources/playerimages/${encodeURIComponent(id)}.png`;
 const fmtDate = (date) => new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Madrid" }).format(new Date(`${date}T12:00:00`));
 
 function activeLeague() {
@@ -173,3 +173,4 @@ $("#match-date").addEventListener("change", (event) => { if (event.target.value)
 $("#refresh").addEventListener("click", refresh);
 refresh();
 setInterval(refresh, 60_000);
+
