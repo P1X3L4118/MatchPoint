@@ -119,10 +119,19 @@ function renderStandings(league) {
 }
 function renderTitleOdds(league) {
   const teams = (league?.titleOdds || []).slice(0, 3);
+  const source = league?.titleOddsSource;
+  const note = $("#title-odds-note");
+  if (source?.updatedAt) {
+    const stamp = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" }).format(new Date(source.updatedAt));
+    const simulations = Number(source.simulations || 0).toLocaleString("es-ES");
+    note.innerHTML = `Fuente: <a href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.name || "Footyntel")}</a> · ${simulations} simulaciones · Actualizado ${stamp} · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>`;
+  } else {
+    note.textContent = "Pronóstico externo no disponible en este momento.";
+  }
   $("#title-odds-list").innerHTML = teams.length ? teams.map((team) => {
     const chance = Math.max(0, Math.min(100, Number(team.probability) || 0));
     return `<div class="title-odds-row"><div class="title-odds-team">${teamImage(team.id, team.name, true)}<span>${esc(team.name)}</span></div><b class="title-odds-value">${chance.toFixed(1).replace(".", ",")}%</b><div class="title-odds-track"><i style="width:${chance}%"></i></div></div>`;
-  }).join("") : `<div class="title-odds-empty">Pronóstico todavía no disponible.</div>`;
+  }).join("") : `<div class="title-odds-empty">Pronóstico externo todavía no disponible.</div>`;
 }
 function renderLeaders(target, players, valueLabel) {
   if (!players?.length) {
