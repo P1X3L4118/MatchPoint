@@ -3,3 +3,7 @@
 .standing-row{border-left:3px solid var(--zone-color,transparent)}.standing-row.is-leader{background:transparent}
 
 .matches-stack{display:grid;gap:14px;align-content:start}.upcoming-panel{padding:17px 18px}@media(max-width:620px){.upcoming-panel{padding:14px 12px}}
+
+/* Logos monocromáticos, manteniendo visibles los detalles sobre el fondo oscuro. */
+.main-league-logo,.side-league-logo img{filter:grayscale(1) brightness(1.3) contrast(.95);opacity:.9}
+.crest,.player-team-logo{filter:grayscale(1) brightness(1.25) contrast(.95)}
