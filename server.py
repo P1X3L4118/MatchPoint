@@ -1,87 +1,112 @@
 from __future__ import annotations
 
-import csv
-import io
 import json
-import os
 import threading
 import time
-from datetime import date, datetime
+from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from urllib.error import URLError
+from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
+
+ROOT = Path(__file__).resolve().parent
+API = "https://www.fotmob.com/api/data/matches"
+CACHE_SECONDS = 30
+_cache: dict[str, tuple[float, dict]] = {}
+_lock = threading.Lock()
 
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
-SEASON_START = date.today().year if date.today().month >= 7 else date.today().year - 1
-SEASON = f"{SEASON_START % 100:02d}{(SEASON_START + 1) % 100:02d}"
-LEAGUES = {"LaLiga": "SP1", "Premier League": "E0", "Serie A": "I1", "Bundesliga": "D1"}
-CACHE_SECONDS = 900
-cache: dict[str, tuple[float, list[dict]]] = {}
-cache_lock = threading.Lock()
+def today_iso() -> str:
+    return datetime.now(ZoneInfo("Europe/Madrid")).date().isoformat()
 
 
-def fetch_matches(league: str) -> list[dict]:
-    now = time.monotonic()
-    with cache_lock:
-        cached = cache.get(league)
-        if cached and now - cached[0] < CACHE_SECONDS:
-            return cached[1]
-
-    division = LEAGUES[league]
-    url = f"https://football-data.co.uk/mmz4281/{SEASON}/{division}.csv"
-    request = Request(url, headers={"User-Agent": "FutbolCentral/1.0"})
-    with urlopen(request, timeout=20) as response:
-        text = response.read().decode("utf-8-sig", errors="replace")
-
-    matches = []
-    for row in csv.DictReader(io.StringIO(text)):
+def normalize_match(league: dict, match: dict) -> dict | None:
+    home, away = match.get("home") or {}, match.get("away") or {}
+    if not home.get("name") or not away.get("name"):
+        return None
+    status = match.get("status") or {}
+    started, finished = bool(status.get("started")), bool(status.get("finished"))
+    cancelled = bool(status.get("cancelled"))
+    state = "cancelled" if cancelled else "finished" if finished else "live" if started else "scheduled"
+    date_value = (status.get("utcTime") or "")[:10]
+    kickoff = ""
+    if status.get("utcTime"):
         try:
-            kickoff = datetime.strptime(row.get("Date", "").strip(), "%d/%m/%Y").date()
+            kickoff = datetime.fromisoformat(status["utcTime"].replace("Z", "+00:00")).astimezone(ZoneInfo("Europe/Madrid")).strftime("%H:%M")
         except ValueError:
-            try:
-                kickoff = datetime.strptime(row.get("Date", "").strip(), "%d/%m/%y").date()
-            except ValueError:
-                continue
-        home, away = row.get("HomeTeam", "").strip(), row.get("AwayTeam", "").strip()
-        if not home or not away:
-            continue
-        home_raw, away_raw = row.get("FTHG", "").strip(), row.get("FTAG", "").strip()
-        has_score = home_raw.isdigit() and away_raw.isdigit()
-        matches.append({
-            "league": league,
-            "date": kickoff.isoformat(),
-            "time": row.get("Time", "").strip(),
-            "home": home,
-            "away": away,
-            "homeScore": int(home_raw) if has_score else None,
-            "awayScore": int(away_raw) if has_score else None,
-            "status": "finished" if has_score else ("unknown" if kickoff < date.today() else ""),
-        })
+            pass
+    if not kickoff:
+        kickoff = str(match.get("time", "")).split(" ")[-1]
+    return {
+        "id": str(match.get("id", "")),
+        "league": league.get("name", "Fútbol"),
+        "leagueLogo": league.get("imageUrl", ""),
+        "home": home.get("name", ""),
+        "away": away.get("name", ""),
+        "homeScore": home.get("score") if started or finished else None,
+        "awayScore": away.get("score") if started or finished else None,
+        "status": state,
+        "statusText": str((match.get("status") or {}).get("reason", {}).get("short", "")),
+        "minute": str(match.get("status") or {}).get("liveTime", ""),
+        "date": date_value,
+        "time": kickoff,
+        "homeId": home.get("id"),
+        "awayId": away.get("id"),
+    }
 
-    if not matches:
-        raise ValueError(f"El CSV de {league} no contiene partidos legibles")
-    with cache_lock:
-        cache[league] = (time.monotonic(), matches)
-    return matches
+
+def fetch_matches(day: str) -> dict:
+    now = time.monotonic()
+    with _lock:
+        hit = _cache.get(day)
+        if hit and now - hit[0] < CACHE_SECONDS:
+            return hit[1]
+    parsed = datetime.strptime(day, "%Y-%m-%d")
+    api_day = parsed.strftime("%Y%m%d")
+    request = Request(f"{API}?date={api_day}", headers={
+        "User-Agent": "FutbolCentral/1.0 (https://github.com/P1X3L4118/prueba)",
+        "Accept": "application/json",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.7",
+        "Cache-Control": "no-cache",
+    })
+    try:
+        with urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        raise RuntimeError(f"FotMob respondió HTTP {error.code}; no se ha intentado eludir el bloqueo.") from error
+    except URLError as error:
+        raise RuntimeError(f"No se pudo conectar con FotMob: {error.reason}") from error
+    leagues = []
+    all_matches = []
+    for group in payload.get("leagues", []):
+        normalized = [m for raw in group.get("matches", []) if (m := normalize_match(group, raw))]
+        if normalized:
+            leagues.append({"name": group.get("name", "Fútbol"), "matches": normalized})
+            all_matches.extend(normalized)
+    result = {"date": day, "updatedAt": datetime.now(ZoneInfo("Europe/Madrid")).isoformat(timespec="seconds"), "source": "FotMob (API no oficial)", "matches": all_matches, "leagues": leagues}
+    with _lock:
+        _cache[day] = (time.monotonic(), result)
+    return result
 
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=ROOT, **kwargs)
+        super().__init__(*args, directory=str(ROOT), **kwargs)
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        if parsed.path != "/api/football-data":
+        if parsed.path != "/api/matches":
             return super().do_GET()
-        league = parse_qs(parsed.query).get("league", [""])[0]
-        if league not in LEAGUES:
-            return self.send_json(400, {"error": "Competición no válida"})
+        day = parse_qs(parsed.query).get("date", [today_iso()])[0]
         try:
-            return self.send_json(200, {"league": league, "source": "Football-Data.co.uk", "matches": fetch_matches(league)})
-        except (URLError, TimeoutError, ValueError, OSError) as error:
-            return self.send_json(502, {"error": f"No se pudieron obtener los datos de {league}: {error}"})
+            datetime.strptime(day, "%Y-%m-%d")
+            return self.send_json(200, fetch_matches(day))
+        except ValueError:
+            return self.send_json(400, {"error": "La fecha debe tener formato AAAA-MM-DD."})
+        except Exception as error:
+            return self.send_json(502, {"error": str(error)})
 
     def send_json(self, status: int, data: dict):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -89,16 +114,15 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
 
 if __name__ == "__main__":
-    os.chdir(ROOT)
     server = ThreadingHTTPServer(("127.0.0.1", 8000), Handler)
-    print(f"Fútbol Central listo en http://127.0.0.1:8000 · temporada {SEASON[:2]}/{SEASON[2:]}")
+    print("Fútbol Central: http://127.0.0.1:8000")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nServidor detenido")
         server.server_close()
