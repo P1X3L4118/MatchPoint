@@ -35,10 +35,16 @@
         <div class="date-controls"><button id="prev-day" class="date-arrow" type="button" aria-label="Día anterior">←</button><button id="today-button" class="today-button" type="button">Hoy</button><input id="match-date" type="date" aria-label="Elige una fecha"><button id="next-day" class="date-arrow" type="button" aria-label="Día siguiente">→</button></div>
       </section>
       <div class="dashboard-grid">
-        <section class="matches-panel panel">
-          <div class="panel-heading"><div><span class="section-kicker" id="match-league-kicker">LALIGA</span><h2>Partidos del día</h2></div><span id="match-count" class="count-pill">—</span></div>
-          <div id="match-list" class="match-list" aria-live="polite"></div>
-        </section>
+        <div class="matches-stack">
+          <section class="matches-panel panel">
+            <div class="panel-heading"><div><span class="section-kicker" id="match-league-kicker">LALIGA</span><h2>Partidos del día</h2></div><span id="match-count" class="count-pill">—</span></div>
+            <div id="match-list" class="match-list" aria-live="polite"></div>
+          </section>
+          <section class="upcoming-panel panel">
+            <div class="panel-heading"><div><span class="section-kicker">A CONTINUACIÓN</span><h2>Siguientes partidos</h2></div><span id="upcoming-count" class="count-pill">—</span></div>
+            <div id="upcoming-list" class="match-list" aria-live="polite"></div>
+          </section>
+        </div>
         <section class="standings-panel panel">
           <div class="panel-heading"><div><span class="section-kicker">CLASIFICACIÓN</span><h2>Tabla completa</h2></div><span id="table-season" class="table-season"></span></div>
           <div class="standings-scroll"><div class="table-head"><span>#</span><span>Club</span><span>PJ</span><span>DG</span><span>Pts</span></div><div id="standings"></div></div>
