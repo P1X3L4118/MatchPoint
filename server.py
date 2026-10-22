@@ -49,7 +49,7 @@ def normalize_match(league: dict, match: dict) -> dict | None:
         "awayScore": away.get("score") if started or finished else None,
         "status": state,
         "statusText": str((match.get("status") or {}).get("reason", {}).get("short", "")),
-        "minute": str(match.get("status") or {}).get("liveTime", ""),
+        "minute": str((match.get("status") or {}).get("liveTime") or ""),
         "date": date_value,
         "time": kickoff,
         "homeId": home.get("id"),
@@ -126,3 +126,4 @@ if __name__ == "__main__":
         server.serve_forever()
     except KeyboardInterrupt:
         server.server_close()
+
