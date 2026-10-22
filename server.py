@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import gzip
+import math
+import random
 import re
 import threading
 import time
@@ -173,6 +175,81 @@ def normalize_player_stats(payload: dict) -> tuple[list[dict], list[dict]]:
             })
     return scorers, assists
 
+def _poisson(mean: float, rng: random.Random) -> int:
+    threshold = math.exp(-mean)
+    product = 1.0
+    goals = 0
+    while product > threshold:
+        goals += 1
+        product *= rng.random()
+    return goals - 1
+
+
+def estimate_title_odds(league_id: int, standings: list[dict], matches: list[dict]) -> list[dict]:
+    """Estima el título simulando los resultados de los partidos pendientes."""
+    if len(standings) < 2:
+        return []
+    by_id = {str(row.get("id")): index for index, row in enumerate(standings) if row.get("id") is not None}
+    played_total = sum(max(0, int(row.get("played") or 0)) for row in standings)
+    goals_total = sum(max(0, int(row.get("gf") or 0)) for row in standings)
+    avg_goals = goals_total / played_total if played_total else 1.35
+    avg_goals = max(0.6, min(2.2, avg_goals))
+    prior_games = 8
+    teams = []
+    for row in standings:
+        played = max(0, int(row.get("played") or 0))
+        gf = max(0, int(row.get("gf") or 0))
+        ga = max(0, int(row.get("ga") or 0))
+        attack = (gf + prior_games * avg_goals) / (played + prior_games) / avg_goals
+        defense = (ga + prior_games * avg_goals) / (played + prior_games) / avg_goals
+        teams.append({
+            "id": row.get("id"), "name": row.get("name", ""),
+            "points": int(row.get("points") or 0), "gd": int(row.get("gd") or 0), "gf": gf,
+            "attack": max(0.55, min(1.65, attack)), "defense": max(0.55, min(1.65, defense)),
+        })
+    today = datetime.now(MADRID).date().isoformat()
+    remaining = []
+    for match in matches:
+        if match.get("status") not in ("scheduled", "postponed"):
+            continue
+        if not match.get("date") or match["date"] < today:
+            continue
+        home, away = by_id.get(str(match.get("homeId"))), by_id.get(str(match.get("awayId")))
+        if home is None or away is None or home == away:
+            continue
+        home_rate = avg_goals * teams[home]["attack"] * teams[away]["defense"] * 1.08
+        away_rate = avg_goals * teams[away]["attack"] * teams[home]["defense"] * 0.92
+        remaining.append((home, away, max(0.15, min(4.5, home_rate)), max(0.15, min(4.5, away_rate))))
+    if not remaining:
+        champion = max(range(len(teams)), key=lambda i: (teams[i]["points"], teams[i]["gd"], teams[i]["gf"]))
+        ranking = sorted(range(len(teams)), key=lambda i: (i == champion, teams[i]["points"], teams[i]["gd"]), reverse=True)[:3]
+        return [{"id": teams[i]["id"], "name": teams[i]["name"], "probability": 100.0 if i == champion else 0.0} for i in ranking]
+    rng = random.Random(league_id)
+    wins = [0] * len(teams)
+    trials = 10000
+    for _ in range(trials):
+        points = [team["points"] for team in teams]
+        goal_diff = [team["gd"] for team in teams]
+        goals_for = [team["gf"] for team in teams]
+        for home, away, home_rate, away_rate in remaining:
+            hg, ag = _poisson(home_rate, rng), _poisson(away_rate, rng)
+            goal_diff[home] += hg - ag
+            goal_diff[away] += ag - hg
+            goals_for[home] += hg
+            goals_for[away] += ag
+            if hg > ag:
+                points[home] += 3
+            elif hg < ag:
+                points[away] += 3
+            else:
+                points[home] += 1
+                points[away] += 1
+        winner = max(range(len(teams)), key=lambda i: (points[i], goal_diff[i], goals_for[i]))
+        wins[winner] += 1
+    ranking = sorted(range(len(teams)), key=lambda i: (-wins[i], -teams[i]["points"], -teams[i]["gd"]))[:3]
+    return [{"id": teams[i]["id"], "name": teams[i]["name"], "probability": round(wins[i] * 100 / trials, 1)} for i in ranking]
+
+
 def fetch_all_data(force: bool = False) -> dict:
     global _cache
     now = time.monotonic()
@@ -186,6 +263,7 @@ def fetch_all_data(force: bool = False) -> dict:
         fixtures = [item for raw in fixtures_data.get("allMatches", []) if (item := normalize_match(raw))]
         standings, legend = normalize_standings(payload)
         scorers, assists = normalize_player_stats(payload)
+        title_odds = estimate_title_odds(config["id"], standings, fixtures)
         result_leagues.append({
             **config,
             "logo": f"https://images.fotmob.com/image_resources/logo/leaguelogo/{config['id']}.png",
@@ -194,6 +272,7 @@ def fetch_all_data(force: bool = False) -> dict:
             "legend": legend,
             "scorers": scorers,
             "assists": assists,
+            "titleOdds": title_odds,
         })
     result = {
         "updatedAt": datetime.now(MADRID).isoformat(timespec="seconds"),
