@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from datetime import datetime
@@ -81,6 +82,12 @@ def normalize_match(match: dict) -> dict | None:
         match_state = "scheduled"
     date_value, kickoff = local_kickoff(status, str(match.get("time", "")).split(" ")[-1])
     has_score = bool(status.get("started") or status.get("finished") or status.get("awarded"))
+    home_score, away_score = home.get("score"), away.get("score")
+    score_text = str(status.get("scoreStr") or "")
+    score_match = re.match(r"\s*(\d+)\s*[-–—:]\s*(\d+)", score_text)
+    if score_match:
+        home_score = home_score if home_score is not None else int(score_match.group(1))
+        away_score = away_score if away_score is not None else int(score_match.group(2))
     return {
         "id": str(match.get("id", "")),
         "round": str(match.get("roundName") or match.get("round") or ""),
@@ -90,8 +97,8 @@ def normalize_match(match: dict) -> dict | None:
         "away": away.get("name", ""),
         "homeId": home.get("id"),
         "awayId": away.get("id"),
-        "homeScore": home.get("score") if has_score else None,
-        "awayScore": away.get("score") if has_score else None,
+        "homeScore": home_score if has_score else None,
+        "awayScore": away_score if has_score else None,
         "status": match_state,
         "statusText": reason_long,
         "cancellationReason": reason_long if match_state in ("cancelled", "postponed", "suspended") else "",
@@ -203,3 +210,4 @@ if __name__ == "__main__":
         server.serve_forever()
     except KeyboardInterrupt:
         server.server_close()
+
