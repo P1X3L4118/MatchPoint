@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import gzip
 import re
 import threading
 import time
@@ -36,7 +37,10 @@ def fotmob_json(url: str) -> dict | list:
     })
     try:
         with urlopen(request, timeout=25) as response:
-            return json.loads(response.read().decode("utf-8"))
+            body = response.read()
+            if body.startswith(b"\\x1f\\x8b"):
+                body = gzip.decompress(body)
+            return json.loads(body.decode("utf-8"))
     except HTTPError as error:
         raise RuntimeError(f"FotMob respondió HTTP {error.code}; no se ha intentado eludir el bloqueo.") from error
     except URLError as error:
