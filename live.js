@@ -12,6 +12,7 @@ const teamLogo = (id) => `https://images.fotmob.com/image_resources/logo/teamlog
 const leagueLogo = (id) => `https://images.fotmob.com/image_resources/logo/leaguelogo/${encodeURIComponent(id)}.png`;
 const playerPhoto = (id) => `https://images.fotmob.com/image_resources/playerimages/${encodeURIComponent(id)}.png`;
 const fmtDate = (date) => new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Madrid" }).format(new Date(`${date}T12:00:00`));
+const fmtShortDate = (date) => new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Madrid" }).format(new Date(`${date}T12:00:00`));
 
 function activeLeague() {
   return state.data?.leagues?.find((league) => Number(league.id) === state.leagueId) || state.data?.leagues?.[0];
@@ -52,22 +53,30 @@ function matchStatus(match) {
   if (match.status === "suspended") return { label: "SUSPENDIDO", className: "cancelled" };
   return { label: match.time || "Hora por confirmar", className: "scheduled" };
 }
+function matchCard(match, showDate = false) {
+  const status = matchStatus(match);
+  const hasScore = match.homeScore !== null && match.homeScore !== undefined && match.awayScore !== null && match.awayScore !== undefined;
+  const stopped = ["cancelled", "postponed", "suspended"].includes(match.status);
+  const statusDescription = stopped ? (match.cancellationReason || match.statusText || "FotMob no indica el motivo del cambio de estado.") : match.status === "live" ? (match.statusText || "Partido en curso") : match.status === "finished" ? (match.statusText || "Tiempo completo") : (match.round ? `Jornada ${match.round}` : "");
+  const kickoff = `${showDate ? `${fmtShortDate(match.date)} · ` : ""}${match.time || "Hora por confirmar"}`;
+  return `<article class="match-card ${stopped ? "match-stopped" : ""}"><div class="match-top"><span class="match-time">${esc(kickoff)}</span><span class="state ${status.className}">${status.className === "live" ? `<i></i>` : ""}${status.label}</span></div><div class="team-line"><div class="team-name">${teamImage(match.homeId, match.home)}<span>${esc(match.home)}</span></div><span class="score ${hasScore ? "" : "muted"}">${hasScore ? esc(match.homeScore) : "—"}</span></div><div class="team-line"><div class="team-name">${teamImage(match.awayId, match.away)}<span>${esc(match.away)}</span></div><span class="score ${hasScore ? "" : "muted"}">${hasScore ? esc(match.awayScore) : "—"}</span></div>${stopped ? `<div class="match-explanation"><b>Motivo</b><span>${esc(statusDescription)}</span></div>` : `<div class="match-bottom"><span>${esc(statusDescription)}</span><span>${match.round ? `Jornada ${esc(match.round)}` : ""}</span></div>`}</article>`;
+}
 function renderMatches(league) {
   const games = (league?.matches || []).filter((match) => match.date === state.date).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   $("#match-count").textContent = `${games.length} ${games.length === 1 ? "partido" : "partidos"}`;
   $("#selected-date-label").textContent = fmtDate(state.date);
   $("#match-date").value = state.date;
-  if (!games.length) {
-    $("#match-list").innerHTML = `<div class="empty-state"><span class="empty-ball">⚽</span><b>No hay partidos este día</b><span>Prueba con otra fecha del calendario de ${esc(league?.name || "la liga")}.</span></div>`;
-    return;
-  }
-  $("#match-list").innerHTML = games.map((match) => {
-    const status = matchStatus(match);
-    const hasScore = match.homeScore !== null && match.homeScore !== undefined && match.awayScore !== null && match.awayScore !== undefined;
-    const stopped = ["cancelled", "postponed", "suspended"].includes(match.status);
-    const statusDescription = stopped ? (match.cancellationReason || match.statusText || "FotMob no indica el motivo del cambio de estado.") : match.status === "live" ? (match.statusText || "Partido en curso") : match.status === "finished" ? (match.statusText || "Tiempo completo") : (match.round ? `Jornada ${match.round}` : "");
-    return `<article class="match-card ${stopped ? "match-stopped" : ""}"><div class="match-top"><span class="match-time">${esc(match.time || "")}</span><span class="state ${status.className}">${status.className === "live" ? `<i></i>` : ""}${status.label}</span></div><div class="team-line"><div class="team-name">${teamImage(match.homeId, match.home)}<span>${esc(match.home)}</span></div><span class="score ${hasScore ? "" : "muted"}">${hasScore ? esc(match.homeScore) : "—"}</span></div><div class="team-line"><div class="team-name">${teamImage(match.awayId, match.away)}<span>${esc(match.away)}</span></div><span class="score ${hasScore ? "" : "muted"}">${hasScore ? esc(match.awayScore) : "—"}</span></div>${stopped ? `<div class="match-explanation"><b>Motivo</b><span>${esc(statusDescription)}</span></div>` : `<div class="match-bottom"><span>${esc(statusDescription)}</span><span>${match.round ? `Jornada ${esc(match.round)}` : ""}</span></div>`}</article>`;
-  }).join("");
+  $("#match-list").innerHTML = games.length ? games.map((match) => matchCard(match)).join("") : `<div class="empty-state"><span class="empty-ball">⚽</span><b>No hay partidos este día</b><span>Prueba con otra fecha del calendario de ${esc(league?.name || "la liga")}.</span></div>`;
+}
+function renderUpcoming(league) {
+  const today = madridDate();
+  const now = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+  const upcoming = (league?.matches || []).filter((match) => {
+    if (!(match.status === "scheduled" || match.status === "postponed") || !match.date || match.date < today) return false;
+    return match.date > today || !match.time || match.time >= now;
+  }).sort((a, b) => `${a.date} ${a.time || "23:59"}`.localeCompare(`${b.date} ${b.time || "23:59"}`)).slice(0, 6);
+  $("#upcoming-count").textContent = `${upcoming.length} ${upcoming.length === 1 ? "partido" : "partidos"}`;
+  $("#upcoming-list").innerHTML = upcoming.length ? upcoming.map((match) => matchCard(match, true)).join("") : `<div class="empty-state"><span class="empty-ball">⚽</span><b>No hay próximos partidos disponibles</b><span>FotMob no muestra más encuentros programados para esta temporada.</span></div>`;
 }
 function zoneFor(league, row) {
   const position = Number(row.rank) - 1;
@@ -123,6 +132,7 @@ function renderAll() {
   renderLeagueNav();
   renderHeader(league);
   renderMatches(league);
+  renderUpcoming(league);
   renderStandings(league);
   renderLeaders("#top-scorers", league.scorers, "goles");
   renderLeaders("#top-assists", league.assists, "asist.");
