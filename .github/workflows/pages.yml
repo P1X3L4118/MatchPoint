@@ -20,8 +20,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Obtener partidos de FotMob
-        run: python fetch_daily.py data/today.json
+      - name: Obtener calendarios, tablas y líderes de FotMob
+        run: python fetch_daily.py data/football.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
