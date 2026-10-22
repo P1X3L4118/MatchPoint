@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const LEAGUE_ORDER = [87, 47, 55, 54, 53];
-const state = { data: null, leagueId: Number(localStorage.getItem("fc-league")) || 87, date: madridDate(), loading: false };
+const state = { data: null, leagueId: Number(localStorage.getItem("fc-league")) || 87, date: madridDate(), loading: false, view: "home" };
 
 function madridDate(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
@@ -23,21 +23,18 @@ function teamImage(id, name, small = false) {
 }
 function renderLeagueNav() {
   const leagues = [...(state.data?.leagues || [])].sort((a, b) => LEAGUE_ORDER.indexOf(Number(a.id)) - LEAGUE_ORDER.indexOf(Number(b.id)));
-  $("#league-nav").innerHTML = leagues.map((league) => `<button class="league-link ${Number(league.id) === state.leagueId ? "active" : ""}" type="button" data-league="${Number(league.id)}"><span class="side-league-logo"><img src="${leagueLogo(league.id)}" alt="" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden>${esc(initials(league.name))}</span></span><span class="side-league-copy"><b>${esc(league.name)}</b><small>${esc(league.country)}</small></span><span class="nav-chevron">›</span></button>`).join("");
-  $("#league-nav").querySelectorAll("[data-league]").forEach((button) => button.addEventListener("click", () => {
-    state.leagueId = Number(button.dataset.league);
-    localStorage.setItem("fc-league", String(state.leagueId));
-    renderAll();
-  }));
+  $("#league-nav").innerHTML = leagues.map((league) => `<button class="league-link ${state.view === "league" && Number(league.id) === state.leagueId ? "active" : ""}" type="button" data-league="${Number(league.id)}"><span class="side-league-logo"><img src="${leagueLogo(league.id)}" alt="" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden>${esc(initials(league.name))}</span></span><span class="side-league-copy"><b>${esc(league.name)}</b><small>${esc(league.country)}</small></span><span class="nav-chevron">›</span></button>`).join("");
+  $("#league-nav").querySelectorAll("[data-league]").forEach((button) => button.addEventListener("click", () => openLeague(Number(button.dataset.league))));
 }
 function renderHeader(league) {
   if (!league) return;
+  $("#crumb-section").textContent = state.view === "home" ? "MATCHPOINT" : "FÚTBOL";
+  $("#crumb-league").textContent = state.view === "home" ? "INICIO" : league.name.toLocaleUpperCase("es-ES");
   $("#league-logo").src = leagueLogo(league.id);
   $("#league-logo").onerror = () => { $("#league-logo").hidden = true; };
   $("#league-logo").hidden = false;
   $("#league-country").textContent = `${league.country} · PRIMERA DIVISIÓN`;
   $("#league-title").textContent = league.name;
-  $("#crumb-league").textContent = league.name.toLocaleUpperCase("es-ES");
   $("#match-league-kicker").textContent = league.name.toLocaleUpperCase("es-ES");
   const year = Number(state.date.slice(0, 4));
   const month = Number(state.date.slice(5, 7));
@@ -144,14 +141,70 @@ function renderLeaders(target, players, valueLabel) {
     return `<div class="leader-row"><span class="leader-rank">${String(index + 1).padStart(2, "0")}</span><span class="player-photo-wrap">${safeId ? `<img class="player-photo" src="${playerPhoto(safeId)}" alt="Foto de ${esc(player.name)}" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false">` : ""}<span class="player-fallback" ${safeId ? "hidden" : ""}>${esc(initials(player.name))}</span></span><span class="player-info"><b>${esc(player.name)}</b><small>${teamId ? `<img class="player-team-logo" src="${teamLogo(teamId)}" alt="" onerror="this.hidden=true">` : ""}${esc(player.team)}</small></span><strong class="player-total">${esc(player.value)}<small>${valueLabel}</small></strong></div>`;
   }).join("");
 }
+function upcomingForHome(match, today, now) {
+  if (!match.date || match.date < today) return false;
+  if (match.status === "live") return true;
+  if (match.status !== "scheduled") return false;
+  return match.date > today || !match.time || match.time >= now;
+}
+function renderHome() {
+  const leagues = [...(state.data?.leagues || [])].sort((a, b) => LEAGUE_ORDER.indexOf(Number(a.id)) - LEAGUE_ORDER.indexOf(Number(b.id)));
+  const today = madridDate();
+  const now = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+  const allMatches = leagues.flatMap((league) => (league.matches || []).map((match) => ({ ...match, leagueId: league.id, leagueName: league.name, competitionLogo: league.logo || leagueLogo(league.id) })));
+  const live = allMatches.filter((match) => match.status === "live");
+  const todayMatches = allMatches.filter((match) => match.date === today && match.status === "scheduled" && (!match.time || match.time >= now));
+  const featured = allMatches.filter((match) => upcomingForHome(match, today, now)).sort((a, b) => {
+    const priority = (match) => match.status === "live" ? 0 : match.date === today ? 1 : 2;
+    return priority(a) - priority(b) || `${a.date} ${a.time || "23:59"}`.localeCompare(`${b.date} ${b.time || "23:59"}`);
+  }).slice(0, 4);
+  $("#home-summary").innerHTML = [
+    ["●", live.length, "En directo"],
+    ["◷", todayMatches.length, "Partidos por jugar hoy"],
+    ["◎", leagues.length, "Competiciones"],
+  ].map(([icon, value, label]) => `<article class="home-summary-card"><span class="home-summary-icon" aria-hidden="true">${icon}</span><span class="home-summary-copy"><b>${value}</b><small>${label}</small></span></article>`).join("");
+  $("#home-featured").innerHTML = featured.length ? featured.map((match) => `<article class="home-featured-card"><div class="home-featured-league"><img src="${esc(match.competitionLogo)}" alt=""><span>${esc(match.leagueName)}</span></div>${matchCard(match, true)}</article>`).join("") : `<div class="home-empty">No hay partidos destacados ahora mismo. Consulta el calendario de cada liga para ver los próximos encuentros.</div>`;
+  const groups = leagues.map((league) => {
+    const matches = (league.matches || []).filter((match) => match.status === "scheduled" && upcomingForHome(match, today, now)).sort((a, b) => `${a.date} ${a.time || "23:59"}`.localeCompare(`${b.date} ${b.time || "23:59"}`)).slice(0, 3);
+    if (!matches.length) return "";
+    const items = matches.map((match) => `<div class="home-upcoming-match"><span class="home-upcoming-time">${esc(fmtShortDate(match.date))}<br>${esc(match.time || "Por confirmar")}</span><span class="home-upcoming-teams"><span class="home-upcoming-team">${teamImage(match.homeId, match.home, true)}<span>${esc(match.home)}</span></span><span class="home-upcoming-team">${teamImage(match.awayId, match.away, true)}<span>${esc(match.away)}</span></span></span></div>`).join("");
+    return `<article class="home-league-group"><div class="home-league-heading"><img src="${leagueLogo(league.id)}" alt=""><span><b>${esc(league.name)}</b><small>${esc(league.country)}</small></span></div><div class="home-upcoming-list">${items}</div><button class="home-group-link" type="button" data-home-league="${Number(league.id)}">Ver liga y calendario →</button></article>`;
+  }).filter(Boolean);
+  $("#home-upcoming").innerHTML = groups.length ? groups.join("") : `<div class="home-empty">No hay próximos partidos disponibles para estas competiciones.</div>`;
+  const leaders = leagues.map((league) => {
+    const leader = league.standings?.[0];
+    if (!leader) return "";
+    return `<button class="home-leader-card" type="button" data-home-league="${Number(league.id)}"><span class="home-leader-league"><img src="${leagueLogo(league.id)}" alt="">${esc(league.name)}</span><span class="home-leader-team">${teamImage(leader.id, leader.name, true)}${esc(leader.shortName || leader.name)}</span><span class="home-leader-points">${esc(leader.points)} pts · Ver clasificación</span></button>`;
+  }).filter(Boolean);
+  $("#home-leaders").innerHTML = leaders.length ? leaders.join("") : `<div class="home-empty">Las clasificaciones aparecerán cuando estén disponibles.</div>`;
+}
+function openHome() {
+  state.view = "home";
+  renderAll();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function openLeague(leagueId) {
+  state.leagueId = leagueId;
+  state.view = "league";
+  localStorage.setItem("fc-league", String(leagueId));
+  renderAll();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 function renderAll() {
   if (state.data?.leagues?.length && !state.data.leagues.some((league) => Number(league.id) === state.leagueId)) {
     state.leagueId = Number(state.data.leagues[0].id);
   }
   const league = activeLeague();
   if (!league) return;
+  const isHome = state.view === "home";
+  $("#home-view").hidden = !isHome;
+  $("#league-view").hidden = isHome;
+  $("#home-nav").classList.toggle("active", isHome);
+  if (isHome) $("#home-nav").setAttribute("aria-current", "page");
+  else $("#home-nav").removeAttribute("aria-current");
   renderLeagueNav();
   renderHeader(league);
+  renderHome();
   renderMatches(league);
   renderUpcoming(league);
   renderStandings(league);
@@ -164,6 +217,14 @@ function renderAll() {
     $("#match-date").max = dates.at(-1);
   }
 }
+$(".brand").addEventListener("click", (event) => { event.preventDefault(); openHome(); });
+$("#home-nav").addEventListener("click", openHome);
+$("#home-view").addEventListener("click", (event) => {
+  const target = event.target.closest("[data-home-action], [data-home-league]");
+  if (!target) return;
+  if (target.dataset.homeAction === "leagues") openLeague(state.leagueId);
+  else if (target.dataset.homeLeague) openLeague(Number(target.dataset.homeLeague));
+});
 async function refresh() {
   if (state.loading) return;
   state.loading = true;
@@ -177,10 +238,12 @@ async function refresh() {
     renderAll();
     const stamp = payload.updatedAt ? new Date(payload.updatedAt) : new Date();
     $("#updated-at").textContent = `Datos ${new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" }).format(stamp)}`;
+    $("#home-status").textContent = `Resultados y calendarios actualizados · ${new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" }).format(stamp)}.`;
     const message = $("#message");
     message.className = "message success-message";
     message.textContent = `Calendarios, clasificaciones y líderes actualizados automáticamente. Última sincronización ${new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" }).format(stamp)}.`;
   } catch (error) {
+    $("#home-status").textContent = `No se pudieron actualizar los partidos: ${error.message}.`;
     const message = $("#message");
     message.className = "message error-message";
     message.textContent = `No se pudieron actualizar los datos: ${error.message}. La API de FotMob es no oficial y puede cambiar o rechazar solicitudes.`;
@@ -204,5 +267,7 @@ $("#next-day").addEventListener("click", () => {
 $("#today-button").addEventListener("click", () => { state.date = madridDate(); renderAll(); });
 $("#match-date").addEventListener("change", (event) => { if (event.target.value) { state.date = event.target.value; renderAll(); } });
 $("#refresh").addEventListener("click", refresh);
+renderHome();
 refresh();
 setInterval(refresh, 60_000);
+

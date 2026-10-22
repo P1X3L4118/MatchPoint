@@ -9,13 +9,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="live.css?v=matchpoint-logo-20261022">
-  <script src="live.js?v=theme-toggle-fix-20261023" defer></script>
+  <link rel="stylesheet" href="live.css?v=matchpoint-home-20261022">
+  <script src="live.js?v=matchpoint-home-20261022" defer></script>
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand" href="./" aria-label="MatchPoint, inicio"><img class="brand-mark" src="./matchpoint-logo.jpg" alt=""><span>MatchPoint</span></a>
+      <a class="brand" href="#home-view" aria-label="MatchPoint, inicio"><img class="brand-mark" src="./matchpoint-logo.jpg" alt=""><span>MatchPoint</span></a>
+      <button id="home-nav" class="home-nav active" type="button" aria-current="page"><span class="home-nav-icon" aria-hidden="true">⌂</span>Inicio</button>
       <p class="sidebar-label">LIGAS</p>
       <nav id="league-nav" class="league-nav" aria-label="Elige una liga"></nav>
       <div class="sidebar-footer">
@@ -28,9 +29,21 @@
     </aside>
     <main class="main-content">
       <header class="topbar">
-        <div class="breadcrumb">FÚTBOL <span>/</span> <b id="crumb-league">LALIGA</b></div>
+        <div class="breadcrumb"><span id="crumb-section">MATCHPOINT</span> <span>/</span> <b id="crumb-league">INICIO</b></div>
         <div class="top-actions"><span class="live-indicator"><i></i> EN DIRECTO</span><span id="updated-at">Cargando datos…</span><button id="refresh" class="refresh-button" type="button" aria-label="Actualizar datos">↻ <span>Actualizar</span></button></div>
       </header>
+      <section id="home-view" class="home-view" aria-labelledby="home-title">
+        <section class="home-hero">
+          <div class="home-hero-copy"><span class="section-kicker">FÚTBOL EUROPEO, EN UN SOLO LUGAR</span><h1 id="home-title">Bienvenido a MatchPoint</h1><p>Partidos en directo, próximos encuentros y todo lo que pasa en las grandes ligas.</p><button class="home-cta" type="button" data-home-action="leagues">Explorar ligas <span aria-hidden="true">→</span></button></div>
+          <img class="home-logo" src="./matchpoint-logo.jpg" alt="Logo de MatchPoint">
+        </section>
+        <p id="home-status" class="home-status" role="status" aria-live="polite">Cargando partidos y clasificaciones…</p>
+        <section class="home-summary" id="home-summary" aria-label="Resumen de la jornada"></section>
+        <section class="home-section" aria-labelledby="featured-title"><div class="home-section-head"><div><span class="section-kicker">AHORA Y LO QUE VIENE</span><h2 id="featured-title">Partidos destacados</h2></div><span class="home-live-tag"><i></i> ACTUALIZADO EN DIRECTO</span></div><div id="home-featured" class="home-featured-grid"></div></section>
+        <section class="home-section" aria-labelledby="home-upcoming-title"><div class="home-section-head"><div><span class="section-kicker">AGENDA</span><h2 id="home-upcoming-title">Próximos partidos</h2></div><span class="home-section-note">Separados por competición</span></div><div id="home-upcoming" class="home-upcoming-grid"></div></section>
+        <section class="home-section" aria-labelledby="home-leaders-title"><div class="home-section-head"><div><span class="section-kicker">ASÍ VA LA TEMPORADA</span><h2 id="home-leaders-title">Líderes de cada liga</h2></div></div><div id="home-leaders" class="home-leaders-grid"></div></section>
+      </section>
+      <div id="league-view" hidden>
       <section class="league-hero">
         <div class="league-title-wrap"><img id="league-logo" class="main-league-logo" alt=""><div><p class="eyebrow" id="league-country">ESPAÑA · PRIMERA DIVISIÓN</p><h1 id="league-title">LaLiga</h1></div></div>
         <div class="season-chip">TEMPORADA <b id="season-label">—</b></div>
@@ -70,6 +83,7 @@
         </div>
       </section>
       <footer>Resultados, tablas y estadísticas: FotMob · Datos de un servicio no oficial; pueden cambiar si el proveedor modifica su API.</footer>
+      </div>
     </main>
   </div>
   <script>
@@ -92,3 +106,4 @@
   </script>
 </body>
 </html>
+
