@@ -197,3 +197,18 @@ $("#match-date").addEventListener("change", (event) => { if (event.target.value)
 $("#refresh").addEventListener("click", refresh);
 refresh();
 setInterval(refresh, 60_000);
+
+
+const themeToggle = $("#theme-toggle");
+function setTheme(theme, animate = false) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("fc-theme", theme);
+  const light = theme === "light";
+  themeToggle.classList.toggle("is-animating", animate);
+  themeToggle.setAttribute("aria-label", `Cambiar a modo ${light ? "oscuro" : "claro"}`);
+  themeToggle.title = `Cambiar a modo ${light ? "oscuro" : "claro"}`;
+  themeToggle.querySelector(".theme-toggle-label").textContent = `Modo ${light ? "oscuro" : "claro"}`;
+  if (animate) window.setTimeout(() => themeToggle.classList.remove("is-animating"), 560);
+}
+setTheme(localStorage.getItem("fc-theme") === "light" ? "light" : "dark");
+themeToggle.addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark", true));
