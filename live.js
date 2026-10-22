@@ -117,6 +117,13 @@ function renderStandings(league) {
   const leaderLegend = `<span><i style="--zone-color:#f1c84b"></i>Líder</span>`;
   $("#zone-legend").innerHTML = leaderLegend + entries.map((zone) => `<span><i style="--zone-color:${esc(zone.color || "#65756b")}"></i>${esc(zone.label)}</span>`).join("");
 }
+function renderTitleOdds(league) {
+  const teams = (league?.titleOdds || []).slice(0, 3);
+  $("#title-odds-list").innerHTML = teams.length ? teams.map((team) => {
+    const chance = Math.max(0, Math.min(100, Number(team.probability) || 0));
+    return `<div class="title-odds-row"><div class="title-odds-team">${teamImage(team.id, team.name, true)}<span>${esc(team.name)}</span></div><b class="title-odds-value">${chance.toFixed(1).replace(".", ",")}%</b><div class="title-odds-track"><i style="width:${chance}%"></i></div></div>`;
+  }).join("") : `<div class="title-odds-empty">Pronóstico todavía no disponible.</div>`;
+}
 function renderLeaders(target, players, valueLabel) {
   if (!players?.length) {
     $(target).innerHTML = `<div class="leader-empty">Estadística aún no disponible.</div>`;
@@ -139,6 +146,7 @@ function renderAll() {
   renderMatches(league);
   renderUpcoming(league);
   renderStandings(league);
+  renderTitleOdds(league);
   renderLeaders("#top-scorers", league.scorers, "goles");
   renderLeaders("#top-assists", league.assists, "asist.");
   const dates = (league.matches || []).map((match) => match.date).filter(Boolean).sort();
