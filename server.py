@@ -199,6 +199,7 @@ def club_key(name: str) -> str:
         "olympiquelyonnais": "lyon", "olympiquemarseille": "marseille",
         "asroma": "roma", "sslazio": "lazio",
         "bayer04leverkusen": "leverkusen", "lilleosc": "lille",
+        "bayerleverkusen": "leverkusen",
     }
     return aliases.get(key, key)
 
