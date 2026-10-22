@@ -15,8 +15,16 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+        id: source-checkout
+      - id: source
+        name: Registrar commit del código compilado
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -32,6 +40,19 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Comprobar que el artefacto corresponde al último commit de main
+        id: freshness
+        env:
+          BUILT_SHA: ${{ needs.build.outputs.source_sha }}
+        run: |
+          latest_sha=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | cut -f1)
+          if [ "$BUILT_SHA" = "$latest_sha" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Se omite la publicación: el artefacto quedó desactualizado."
+          fi
       - name: Publicar en GitHub Pages
         id: deployment
+        if: steps.freshness.outputs.current == 'true'
         uses: actions/deploy-pages@v4
