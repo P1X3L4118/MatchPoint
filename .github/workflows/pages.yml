@@ -10,7 +10,7 @@ permissions:
   pages: write
   id-token: write
 concurrency:
-  group: pages
+  group: matchpoint-highlights
   cancel-in-progress: ${{ github.event_name != 'schedule' }}
 jobs:
   build:
