@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="live.css?v=theme-toggle-20261023">
-  <script src="live.js?v=theme-toggle-20261023" defer></script>
+  <link rel="stylesheet" href="live.css?v=theme-toggle-fix-20261023">
+  <script src="live.js?v=theme-toggle-fix-20261023" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -18,8 +18,13 @@
       <a class="brand" href="./" aria-label="Fútbol Central, inicio"><span class="brand-mark">FC</span><span>fútbol<span class="brand-light">central</span></span></a>
       <p class="sidebar-label">LIGAS</p>
       <nav id="league-nav" class="league-nav" aria-label="Elige una liga"></nav>
-      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Cambiar a modo claro" title="Cambiar a modo claro"><span class="theme-toggle-icon moon-icon" aria-hidden="true">☾</span><span class="theme-toggle-icon sun-icon" aria-hidden="true">☀</span><span class="theme-toggle-label">Modo claro</span></button>
-      <div class="sidebar-source"><span class="source-dot"></span><span>Datos de FotMob</span><small>ACTUALIZACIÓN AUTOMÁTICA</small></div>
+      <div class="sidebar-footer">
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Cambiar a modo claro" title="Cambiar a modo claro">
+          <svg class="theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 15.3A8.5 8.5 0 0 1 8.7 3.8 8.7 8.7 0 1 0 20.2 15.3Z"/></svg>
+          <svg class="theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+        </button>
+        <div class="sidebar-source"><span class="source-dot"></span><span>Datos de FotMob</span><small>ACTUALIZACIÓN AUTOMÁTICA</small></div>
+      </div>
     </aside>
     <main class="main-content">
       <header class="topbar">
@@ -67,5 +72,23 @@
       <footer>Resultados, tablas y estadísticas: FotMob · Datos de un servicio no oficial; pueden cambiar si el proveedor modifica su API.</footer>
     </main>
   </div>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const button = document.getElementById("theme-toggle");
+      const readTheme = () => { try { return localStorage.getItem("fc-theme"); } catch { return null; } };
+      const saveTheme = (theme) => { try { localStorage.setItem("fc-theme", theme); } catch {} };
+      const applyTheme = (theme, animate = false) => {
+        root.dataset.theme = theme;
+        button.setAttribute("aria-label", `Cambiar a modo ${theme === "dark" ? "claro" : "oscuro"}`);
+        button.title = `Cambiar a modo ${theme === "dark" ? "claro" : "oscuro"}`;
+        button.classList.toggle("is-animating", animate);
+        if (animate) window.setTimeout(() => button.classList.remove("is-animating"), 650);
+        saveTheme(theme);
+      };
+      applyTheme(readTheme() === "light" ? "light" : "dark");
+      button.addEventListener("click", () => applyTheme(root.dataset.theme === "dark" ? "light" : "dark", true));
+    })();
+  </script>
 </body>
 </html>
