@@ -103,13 +103,16 @@ function renderStandings(league) {
     if (zone.key) categories.set(zone.key, zone);
     const leader = index === 0;
     const label = leader ? (zone.label ? `Líder · ${zone.label}` : "Líder") : zone.label;
-    const markerColor = zone.color || (leader ? "#b9f36b" : "transparent");
+    // FotMob incluye el color de clasificación de cada fila. Priorizarlo evita
+    // desplazar plazas cuando una liga añade rondas o puestos europeos extra.
+    // El líder lleva un marcador dorado propio aunque también clasifique a Champions.
+    const markerColor = leader ? "#f1c84b" : (row.qualColor || zone.color || "transparent");
     return `<div class="standing-row ${zone.key ? `zone-${zone.key}` : ""} ${leader ? "is-leader" : ""}" style="--zone-color:${esc(markerColor)}" title="${esc(label || "")}"><span class="rank-cell">${esc(row.rank)}</span><span class="standing-club">${teamImage(row.id, row.name, true)}<span>${esc(row.shortName || row.name)}</span></span><span>${esc(row.played)}</span><span class="goal-diff ${Number(row.gd) > 0 ? "positive" : Number(row.gd) < 0 ? "negative" : ""}">${Number(row.gd) > 0 ? "+" : ""}${esc(row.gd)}</span><b class="points-cell">${esc(row.points)}</b></div>`;
   }).join("");
   $("#standings").innerHTML = html;
   const order = ["champions", "conference", "europa", "relegation"];
   const entries = order.map((key) => categories.get(key)).filter(Boolean);
-  const leaderLegend = `<span><i style="--zone-color:#b9f36b"></i>Líder</span>`;
+  const leaderLegend = `<span><i style="--zone-color:#f1c84b"></i>Líder</span>`;
   $("#zone-legend").innerHTML = leaderLegend + entries.map((zone) => `<span><i style="--zone-color:${esc(zone.color || "#65756b")}"></i>${esc(zone.label)}</span>`).join("");
 }
 function renderLeaders(target, players, valueLabel) {
