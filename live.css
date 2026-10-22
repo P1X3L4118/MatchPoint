@@ -21,3 +21,7 @@
 .title-odds-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#8ecb45,#b9f36b);transition:width .35s ease}
 .title-odds-note{margin:11px 0 0;color:#75837a;font-size:8px;line-height:1.45}
 .title-odds-empty{padding:5px 0;color:#8a978e;font-size:9px}
+
+/* Preserve original FotMob colors for league and club artwork. */
+.main-league-logo{filter:drop-shadow(0 6px 13px #0008)!important;opacity:1!important;mix-blend-mode:normal!important}
+.side-league-logo img,.crest,.player-team-logo{filter:none!important;opacity:1!important;mix-blend-mode:normal!important}
