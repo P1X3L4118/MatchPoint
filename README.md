@@ -1,20 +1,29 @@
-# Futbol Central
+# Fútbol Central · Marcadores en directo
 
-Panel de futbol en HTML, CSS y JavaScript. OpenFootball aporta el calendario completo y Football-Data.co.uk aporta los resultados de los partidos jugados. La clasificacion se calcula localmente con esos marcadores, sin usar ESPN.
+Tablero responsive de partidos del día en HTML, CSS y JavaScript. Consume el endpoint diario de FotMob (`/api/data/matches?date=YYYYMMDD`), un servicio interno no oficial y sin garantía de disponibilidad. No intenta sortear medidas anti bot: cuando el origen rechaza una petición, presenta el error.
 
-## Fuentes de datos
+## Ejecutar localmente
 
-- Calendario completo: [OpenFootball/football.json](https://github.com/openfootball/football.json).
-- Resultados: [Football-Data.co.uk](https://www.football-data.co.uk/), archivos CSV de LaLiga, Premier League, Serie A y Bundesliga. Se solicita la edicion vigente de la temporada al proveedor.
-- Clasificacion: se calcula a partir de los partidos con marcador final del CSV. Los partidos pasados sin resultado confirmado aparecen como "Sin resultado".
-- Escudos: FootyLogos, con iniciales del club como respaldo visual.
-
-El proyecto incluye un servidor local de Python que evita el bloqueo CORS del CSV. Python 3.9 o posterior es el unico requisito; no se necesita clave API. Abre la pagina desde ese servidor, no desde la extension Live Server.
-
-## Ejecutar
+Requiere Python 3.10 o posterior. Desde la carpeta del proyecto:
 
 ```sh
 python server.py
 ```
 
-Abre `http://127.0.0.1:8000`. El servidor guarda cada CSV en memoria durante 15 minutos y lo vuelve a consultar al expirar la cache.
+Abre <http://127.0.0.1:8000>. El proxy consulta `/api/matches`, usa una caché corta de 30 segundos y el navegador vuelve a pedir los datos cada 60 segundos. Se envía un User-Agent transparente de la aplicación, encabezados normales de aceptación e idioma; no se falsifica una sesión de navegador.
+
+## GitHub Pages
+
+El workflow `.github/workflows/pages.yml` consulta FotMob cada cinco minutos y publica el sitio junto a `data/today.json`. El navegador solicita esa copia cada minuto. El refresco de la fuente queda sujeto al calendario y la carga de GitHub Actions; por tanto, Pages no garantiza datos en vivo segundo a segundo.
+
+Para habilitar la publicación, en GitHub abre **Settings → Pages** y selecciona **GitHub Actions** como fuente de compilación. El primer despliegue se inicia automáticamente al subir el workflow. La URL será <https://p1x3l4118.github.io/prueba/> si Pages está habilitado en ese repositorio.
+
+## Estructura
+
+- `index.html`, `live.css`, `live.js`: interfaz y polling.
+- `server.py`: proxy local a FotMob.
+- `fetch_daily.py`: exportador de la instantánea para Pages.
+- `.github/workflows/pages.yml`: actualización periódica y publicación.
+- `data/today.json`: instantánea pública creada por Actions.
+
+FotMob no ofrece aquí una API pública oficial; puede cambiar la respuesta o bloquear el acceso. Los nombres, escudos, marcadores y estados dependen de la fuente.
