@@ -48,13 +48,14 @@ function matchStatus(match) {
   if (match.status === "cancelled") return { label: "ANULADO", className: "cancelled" };
   if (match.status === "postponed") return { label: "APLAZADO", className: "postponed" };
   if (match.status === "suspended") return { label: "SUSPENDIDO", className: "cancelled" };
+  if (match.status === "abandoned") return { label: "ABANDONADO", className: "cancelled" };
   return { label: match.time || "Hora por confirmar", className: "scheduled" };
 }
 function matchCard(match, showDate = false) {
   const status = matchStatus(match);
   const hasScore = match.homeScore !== null && match.homeScore !== undefined && match.awayScore !== null && match.awayScore !== undefined;
-  const stopped = ["cancelled", "postponed", "suspended"].includes(match.status);
-  const statusDescription = stopped ? (match.cancellationReason || match.statusText || "FotMob no indica el motivo del cambio de estado.") : match.status === "live" ? (match.statusText || "Partido en curso") : match.status === "finished" ? (match.statusText || "Tiempo completo") : (match.round ? `Jornada ${match.round}` : "");
+  const stopped = ["cancelled", "postponed", "suspended", "abandoned"].includes(match.status);
+  const statusDescription = stopped ? (match.cancellationReason || match.statusText || "FotMob no indica el motivo del cambio de estado.") : match.awarded ? "Partido decidido administrativamente" : match.status === "live" ? (match.statusText || "Partido en curso") : match.status === "finished" ? (match.statusText || "Tiempo completo") : (match.round ? `Jornada ${match.round}` : "");
   const kickoff = `${showDate ? `${fmtShortDate(match.date)} · ` : ""}${match.time || "Hora por confirmar"}`;
   return `<article class="match-card ${stopped ? "match-stopped" : ""}"><div class="match-top"><span class="match-time">${esc(kickoff)}</span><span class="state ${status.className}">${status.className === "live" ? `<i></i>` : ""}${status.label}</span></div><div class="team-line"><div class="team-name">${teamImage(match.homeId, match.home)}<span>${esc(match.home)}</span></div><span class="score ${hasScore ? "" : "muted"}">${hasScore ? esc(match.homeScore) : "—"}</span></div><div class="team-line"><div class="team-name">${teamImage(match.awayId, match.away)}<span>${esc(match.away)}</span></div><span class="score ${hasScore ? "" : "muted"}">${hasScore ? esc(match.awayScore) : "—"}</span></div>${stopped ? `<div class="match-explanation"><b>Motivo</b><span>${esc(statusDescription)}</span></div>` : `<div class="match-bottom"><span>${esc(statusDescription)}</span><span>${match.round ? `Jornada ${esc(match.round)}` : ""}</span></div>`}</article>`;
 }
@@ -147,6 +148,30 @@ function upcomingForHome(match, today, now) {
   if (match.status !== "scheduled") return false;
   return match.date > today || !match.time || match.time >= now;
 }
+function highlightFor(match, sinceDate) {
+  const statusLabels = {
+    cancelled: "Partido anulado",
+    abandoned: "Partido abandonado",
+    suspended: "Partido suspendido",
+    postponed: "Partido aplazado",
+  };
+  if (!match.date || match.date < sinceDate) return null;
+  if (statusLabels[match.status]) return { label: statusLabels[match.status], priority: 0, tone: "cancelled" };
+  if (match.awarded) return { label: "Victoria administrativa", priority: 1, tone: "finished" };
+  if (match.status !== "finished" && match.status !== "live") return null;
+  if (match.homeScore === null || match.homeScore === undefined || match.awayScore === null || match.awayScore === undefined) return null;
+
+  const home = Number(match.homeScore);
+  const away = Number(match.awayScore);
+  if (!Number.isFinite(home) || !Number.isFinite(away)) return null;
+  const margin = Math.abs(home - away);
+  const goals = home + away;
+  if (margin >= 3) return { label: `Goleada por ${margin} goles`, priority: 2, tone: "finished" };
+  if (goals >= 7) return { label: "Festival de goles", priority: 3, tone: "finished" };
+  if (goals >= 6) return { label: "Partido con muchos goles", priority: 4, tone: "finished" };
+  if (goals >= 5 && margin <= 1) return { label: "Partidazo igualado", priority: 5, tone: "finished" };
+  return null;
+}
 function renderHome() {
   const leagues = [...(state.data?.leagues || [])].sort((a, b) => LEAGUE_ORDER.indexOf(Number(a.id)) - LEAGUE_ORDER.indexOf(Number(b.id)));
   const today = madridDate();
@@ -154,16 +179,24 @@ function renderHome() {
   const allMatches = leagues.flatMap((league) => (league.matches || []).map((match) => ({ ...match, leagueId: league.id, leagueName: league.name, competitionLogo: league.logo || leagueLogo(league.id) })));
   const live = allMatches.filter((match) => match.status === "live");
   const todayMatches = allMatches.filter((match) => match.date === today && match.status === "scheduled" && (!match.time || match.time >= now));
-  const featured = allMatches.filter((match) => upcomingForHome(match, today, now)).sort((a, b) => {
-    const priority = (match) => match.status === "live" ? 0 : match.date === today ? 1 : 2;
-    return priority(a) - priority(b) || `${a.date} ${a.time || "23:59"}`.localeCompare(`${b.date} ${b.time || "23:59"}`);
-  }).slice(0, 4);
+  const cutoff = new Date(`${today}T12:00:00`);
+  cutoff.setDate(cutoff.getDate() - 14);
+  const sinceDate = madridDate(cutoff);
+  const featured = allMatches.map((match) => ({ ...match, highlight: highlightFor(match, sinceDate) }))
+    .filter((match) => match.highlight)
+    .sort((a, b) => a.highlight.priority - b.highlight.priority || b.date.localeCompare(a.date) || (a.time || "").localeCompare(b.time || ""))
+    .slice(0, 6);
   $("#home-summary").innerHTML = [
     ["●", live.length, "En directo"],
     ["◷", todayMatches.length, "Partidos por jugar hoy"],
     ["◎", leagues.length, "Competiciones"],
   ].map(([icon, value, label]) => `<article class="home-summary-card"><span class="home-summary-icon" aria-hidden="true">${icon}</span><span class="home-summary-copy"><b>${value}</b><small>${label}</small></span></article>`).join("");
-  $("#home-featured").innerHTML = featured.length ? featured.map((match) => `<article class="home-featured-card"><div class="home-featured-league"><img src="${esc(match.competitionLogo)}" alt=""><span>${esc(match.leagueName)}</span></div>${matchCard(match, true)}</article>`).join("") : `<div class="home-empty">No hay partidos destacados ahora mismo. Consulta el calendario de cada liga para ver los próximos encuentros.</div>`;
+  $("#featured-title").parentElement.querySelector(".section-kicker").textContent = "RESULTADOS QUE LLAMAN LA ATENCIÓN";
+  $(".home-live-tag").innerHTML = "<i></i> ÚLTIMOS 14 DÍAS";
+  $("#home-featured").innerHTML = featured.length ? featured.map((match) => {
+    const tone = match.highlight.tone === "cancelled" ? "cancelled" : "finished";
+    return `<article class="home-featured-card"><div class="home-featured-league"><img src="${esc(match.competitionLogo)}" alt=""><span>${esc(match.leagueName)}</span></div><span class="state ${tone}" style="display:inline-flex;margin:0 0 8px;padding:5px 8px;border:1px solid currentColor;border-radius:999px">${esc(match.highlight.label)}</span>${matchCard(match, true)}</article>`;
+  }).join("") : `<div class="home-empty">En los últimos 14 días no hay goleadas, partidos con muchos goles ni encuentros anulados, suspendidos o aplazados. Aquí aparecerán cuando se produzcan.</div>`;
   const groups = leagues.map((league) => {
     const matches = (league.matches || []).filter((match) => match.status === "scheduled" && upcomingForHome(match, today, now)).sort((a, b) => `${a.date} ${a.time || "23:59"}`.localeCompare(`${b.date} ${b.time || "23:59"}`)).slice(0, 3);
     if (!matches.length) return "";
