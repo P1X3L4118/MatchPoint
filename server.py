@@ -12,82 +12,164 @@ from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent
-API = "https://www.fotmob.com/api/data/matches"
-CACHE_SECONDS = 30
-_cache: dict[str, tuple[float, dict]] = {}
+API = "https://www.fotmob.com/api/data/leagues"
+LEAGUES = [
+    {"id": 87, "name": "LaLiga", "country": "España"},
+    {"id": 47, "name": "Premier League", "country": "Inglaterra"},
+    {"id": 55, "name": "Serie A", "country": "Italia"},
+    {"id": 54, "name": "Bundesliga", "country": "Alemania"},
+    {"id": 53, "name": "Ligue 1 McDonald's", "country": "Francia"},
+]
+CACHE_SECONDS = 300
+_cache: tuple[float, dict] | None = None
 _lock = threading.Lock()
+MADRID = ZoneInfo("Europe/Madrid")
 
 
-def today_iso() -> str:
-    return datetime.now(ZoneInfo("Europe/Madrid")).date().isoformat()
-
-
-def normalize_match(league: dict, match: dict) -> dict | None:
-    home, away = match.get("home") or {}, match.get("away") or {}
-    if not home.get("name") or not away.get("name"):
-        return None
-    status = match.get("status") or {}
-    started, finished = bool(status.get("started")), bool(status.get("finished"))
-    cancelled = bool(status.get("cancelled"))
-    state = "cancelled" if cancelled else "finished" if finished else "live" if started else "scheduled"
-    date_value = (status.get("utcTime") or "")[:10]
-    kickoff = ""
-    if status.get("utcTime"):
-        try:
-            kickoff = datetime.fromisoformat(status["utcTime"].replace("Z", "+00:00")).astimezone(ZoneInfo("Europe/Madrid")).strftime("%H:%M")
-        except ValueError:
-            pass
-    if not kickoff:
-        kickoff = str(match.get("time", "")).split(" ")[-1]
-    return {
-        "id": str(match.get("id", "")),
-        "league": league.get("name", "Fútbol"),
-        "leagueLogo": league.get("imageUrl", ""),
-        "home": home.get("name", ""),
-        "away": away.get("name", ""),
-        "homeScore": home.get("score") if started or finished else None,
-        "awayScore": away.get("score") if started or finished else None,
-        "status": state,
-        "statusText": str((match.get("status") or {}).get("reason", {}).get("short", "")),
-        "minute": str((match.get("status") or {}).get("liveTime") or ""),
-        "date": date_value,
-        "time": kickoff,
-        "homeId": home.get("id"),
-        "awayId": away.get("id"),
-    }
-
-
-def fetch_matches(day: str) -> dict:
-    now = time.monotonic()
-    with _lock:
-        hit = _cache.get(day)
-        if hit and now - hit[0] < CACHE_SECONDS:
-            return hit[1]
-    parsed = datetime.strptime(day, "%Y-%m-%d")
-    api_day = parsed.strftime("%Y%m%d")
-    request = Request(f"{API}?date={api_day}", headers={
+def fotmob_json(url: str) -> dict | list:
+    request = Request(url, headers={
         "User-Agent": "FutbolCentral/1.0 (https://github.com/P1X3L4118/prueba)",
         "Accept": "application/json",
         "Accept-Language": "es-ES,es;q=0.9,en;q=0.7",
         "Cache-Control": "no-cache",
     })
     try:
-        with urlopen(request, timeout=20) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+        with urlopen(request, timeout=25) as response:
+            return json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
         raise RuntimeError(f"FotMob respondió HTTP {error.code}; no se ha intentado eludir el bloqueo.") from error
     except URLError as error:
         raise RuntimeError(f"No se pudo conectar con FotMob: {error.reason}") from error
-    leagues = []
-    all_matches = []
-    for group in payload.get("leagues", []):
-        normalized = [m for raw in group.get("matches", []) if (m := normalize_match(group, raw))]
-        if normalized:
-            leagues.append({"name": group.get("name", "Fútbol"), "matches": normalized})
-            all_matches.extend(normalized)
-    result = {"date": day, "updatedAt": datetime.now(ZoneInfo("Europe/Madrid")).isoformat(timespec="seconds"), "source": "FotMob (API no oficial)", "matches": all_matches, "leagues": leagues}
+
+
+def local_kickoff(status: dict, fallback: str = "") -> tuple[str, str]:
+    utc_time = status.get("utcTime")
+    if utc_time:
+        try:
+            moment = datetime.fromisoformat(utc_time.replace("Z", "+00:00")).astimezone(MADRID)
+            return moment.date().isoformat(), moment.strftime("%H:%M")
+        except ValueError:
+            pass
+    return "", fallback
+
+
+def normalize_match(match: dict) -> dict | None:
+    home, away = match.get("home") or {}, match.get("away") or {}
+    if not home.get("name") or not away.get("name"):
+        return None
+    status = match.get("status") or {}
+    if not isinstance(status, dict):
+        status = {}
+    reason = status.get("reason") or {}
+    if not isinstance(reason, dict):
+        reason = {}
+    reason_short = str(reason.get("short") or "")
+    reason_long = str(reason.get("long") or reason_short)
+    cancelled = bool(status.get("cancelled"))
+    reason_key = f"{reason_short} {reason_long}".casefold()
+    if "suspend" in reason_key:
+        match_state = "suspended"
+    elif ("postpon" in reason_key or "aplaz" in reason_key) and not status.get("started"):
+        match_state = "postponed"
+    elif cancelled:
+        match_state = "cancelled"
+    elif status.get("finished") or status.get("awarded"):
+        match_state = "finished"
+    elif status.get("started"):
+        match_state = "live"
+    else:
+        match_state = "scheduled"
+    date_value, kickoff = local_kickoff(status, str(match.get("time", "")).split(" ")[-1])
+    has_score = bool(status.get("started") or status.get("finished") or status.get("awarded"))
+    return {
+        "id": str(match.get("id", "")),
+        "round": str(match.get("roundName") or match.get("round") or ""),
+        "date": date_value,
+        "time": kickoff,
+        "home": home.get("name", ""),
+        "away": away.get("name", ""),
+        "homeId": home.get("id"),
+        "awayId": away.get("id"),
+        "homeScore": home.get("score") if has_score else None,
+        "awayScore": away.get("score") if has_score else None,
+        "status": match_state,
+        "statusText": reason_long,
+        "cancellationReason": reason_long if match_state in ("cancelled", "postponed", "suspended") else "",
+    }
+
+
+def normalize_standings(payload: dict) -> tuple[list[dict], list[dict]]:
+    blocks = payload.get("table") or []
+    if not blocks:
+        return [], []
+    data = blocks[0].get("data") or {}
+    table = data.get("table") or {}
+    rows = []
+    for row in table.get("all") or []:
+        scores = str(row.get("scoresStr") or "0-0").split("-", 1)
+        goals_for = int(scores[0]) if scores and scores[0].isdigit() else 0
+        goals_against = int(scores[1]) if len(scores) > 1 and scores[1].isdigit() else 0
+        rows.append({
+            "name": row.get("name", ""), "shortName": row.get("shortName", row.get("name", "")),
+            "id": row.get("id"), "played": row.get("played", 0), "wins": row.get("wins", 0),
+            "draws": row.get("draws", 0), "losses": row.get("losses", 0), "gf": goals_for,
+            "ga": goals_against, "gd": row.get("goalConDiff", goals_for - goals_against),
+            "points": row.get("pts", 0), "rank": row.get("idx", len(rows) + 1),
+            "qualColor": row.get("qualColor", ""),
+        })
+    legend = data.get("legend") or []
+    return rows, [{"title": item.get("title", ""), "color": item.get("color", ""), "indices": item.get("indices", [])} for item in legend]
+
+
+def normalize_player_stats(payload: dict) -> tuple[list[dict], list[dict]]:
+    stats = payload.get("stats") or {}
+    scorers, assists = [], []
+    for stat in stats.get("players") or []:
+        header = str(stat.get("header") or "").casefold()
+        if "scorer" in header or "goleador" in header or header == "goals":
+            target = scorers
+        elif "assist" in header or "asistencia" in header:
+            target = assists
+        else:
+            continue
+        for player in stat.get("topThree") or []:
+            target.append({
+                "id": player.get("id"), "name": player.get("name", ""),
+                "team": player.get("teamName", ""), "teamId": player.get("teamId"),
+                "value": player.get("value", 0), "rank": player.get("rank", 0),
+            })
+    return scorers, assists
+
+
+def fetch_all_data(force: bool = False) -> dict:
+    global _cache
+    now = time.monotonic()
     with _lock:
-        _cache[day] = (time.monotonic(), result)
+        if not force and _cache and now - _cache[0] < CACHE_SECONDS:
+            return _cache[1]
+    result_leagues = []
+    for config in LEAGUES:
+        payload = fotmob_json(f"{API}?id={config['id']}")
+        fixtures_data = payload.get("fixtures") or {}
+        fixtures = [item for raw in fixtures_data.get("allMatches", []) if (item := normalize_match(raw))]
+        standings, legend = normalize_standings(payload)
+        scorers, assists = normalize_player_stats(payload)
+        result_leagues.append({
+            **config,
+            "logo": f"https://images.fotmob.com/image_resources/logo/leaguelogo/{config['id']}.png",
+            "matches": fixtures,
+            "standings": standings,
+            "legend": legend,
+            "scorers": scorers,
+            "assists": assists,
+        })
+    result = {
+        "updatedAt": datetime.now(MADRID).isoformat(timespec="seconds"),
+        "source": "FotMob (API no oficial)",
+        "leagues": result_leagues,
+    }
+    with _lock:
+        _cache = (time.monotonic(), result)
     return result
 
 
@@ -96,15 +178,10 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
     def do_GET(self):
-        parsed = urlparse(self.path)
-        if parsed.path != "/api/matches":
+        if urlparse(self.path).path != "/api/football":
             return super().do_GET()
-        day = parse_qs(parsed.query).get("date", [today_iso()])[0]
         try:
-            datetime.strptime(day, "%Y-%m-%d")
-            return self.send_json(200, fetch_matches(day))
-        except ValueError:
-            return self.send_json(400, {"error": "La fecha debe tener formato AAAA-MM-DD."})
+            return self.send_json(200, fetch_all_data())
         except Exception as error:
             return self.send_json(502, {"error": str(error)})
 
@@ -126,4 +203,3 @@ if __name__ == "__main__":
         server.serve_forever()
     except KeyboardInterrupt:
         server.server_close()
-
