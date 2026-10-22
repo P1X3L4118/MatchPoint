@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import json
 import gzip
-import math
-import random
 import re
 import threading
 import time
+import unicodedata
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -24,6 +23,13 @@ LEAGUES = [
     {"id": 54, "name": "Bundesliga", "country": "Alemania"},
     {"id": 53, "name": "Ligue 1 McDonald's", "country": "Francia"},
 ]
+FOOTYNTEL = {
+    87: ("pd", "la-liga"),
+    47: ("pl", "premier-league"),
+    55: ("sa", "serie-a"),
+    54: ("bl1", "bundesliga"),
+    53: ("fl1", "ligue-1"),
+}
 CACHE_SECONDS = 300
 _cache: tuple[float, dict] | None = None
 _lock = threading.Lock()
@@ -175,79 +181,76 @@ def normalize_player_stats(payload: dict) -> tuple[list[dict], list[dict]]:
             })
     return scorers, assists
 
-def _poisson(mean: float, rng: random.Random) -> int:
-    threshold = math.exp(-mean)
-    product = 1.0
-    goals = 0
-    while product > threshold:
-        goals += 1
-        product *= rng.random()
-    return goals - 1
+def club_key(name: str) -> str:
+    plain = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode("ascii").casefold()
+    plain = re.sub(r"\b(?:fc|cf|afc|ssc|ac|club|clube|the|de|do|da|del|la|le|los|las|and)\b", " ", plain)
+    key = re.sub(r"[^a-z0-9]", "", plain)
+    aliases = {
+        "barca": "barcelona", "fcbarcelona": "barcelona",
+        "atleti": "atleticomadrid", "clubatleticodemadrid": "atleticomadrid",
+        "realmadridcf": "realmadrid", "realbetisbalompie": "realbetis",
+        "manchestercityfc": "manchestercity", "mancity": "manchestercity",
+        "brightonhove": "brighton", "brightonhovealbion": "brighton",
+        "fcinternazionalemilano": "inter", "internazionalemilano": "inter",
+        "internazionale": "inter", "intermilan": "inter",
+        "fcbayernmunchen": "bayernmunchen", "bayern": "bayernmunchen",
+        "borussiadortmund": "dortmund", "bvb": "dortmund",
+        "parissaintgermain": "psg", "parissg": "psg",
+        "olympiquelyonnais": "lyon", "olympiquemarseille": "marseille",
+    }
+    return aliases.get(key, key)
 
 
-def estimate_title_odds(league_id: int, standings: list[dict], matches: list[dict]) -> list[dict]:
-    """Estima el título simulando los resultados de los partidos pendientes."""
-    if len(standings) < 2:
-        return []
-    by_id = {str(row.get("id")): index for index, row in enumerate(standings) if row.get("id") is not None}
-    played_total = sum(max(0, int(row.get("played") or 0)) for row in standings)
-    goals_total = sum(max(0, int(row.get("gf") or 0)) for row in standings)
-    avg_goals = goals_total / played_total if played_total else 1.35
-    avg_goals = max(0.6, min(2.2, avg_goals))
-    prior_games = 8
-    teams = []
-    for row in standings:
-        played = max(0, int(row.get("played") or 0))
-        gf = max(0, int(row.get("gf") or 0))
-        ga = max(0, int(row.get("ga") or 0))
-        attack = (gf + prior_games * avg_goals) / (played + prior_games) / avg_goals
-        defense = (ga + prior_games * avg_goals) / (played + prior_games) / avg_goals
-        teams.append({
-            "id": row.get("id"), "name": row.get("name", ""),
-            "points": int(row.get("points") or 0), "gd": int(row.get("gd") or 0), "gf": gf,
-            "attack": max(0.55, min(1.65, attack)), "defense": max(0.55, min(1.65, defense)),
-        })
-    today = datetime.now(MADRID).date().isoformat()
-    remaining = []
-    for match in matches:
-        if match.get("status") not in ("scheduled", "postponed"):
-            continue
-        if not match.get("date") or match["date"] < today:
-            continue
-        home, away = by_id.get(str(match.get("homeId"))), by_id.get(str(match.get("awayId")))
-        if home is None or away is None or home == away:
-            continue
-        home_rate = avg_goals * teams[home]["attack"] * teams[away]["defense"] * 1.08
-        away_rate = avg_goals * teams[away]["attack"] * teams[home]["defense"] * 0.92
-        remaining.append((home, away, max(0.15, min(4.5, home_rate)), max(0.15, min(4.5, away_rate))))
-    if not remaining:
-        champion = max(range(len(teams)), key=lambda i: (teams[i]["points"], teams[i]["gd"], teams[i]["gf"]))
-        ranking = sorted(range(len(teams)), key=lambda i: (i == champion, teams[i]["points"], teams[i]["gd"]), reverse=True)[:3]
-        return [{"id": teams[i]["id"], "name": teams[i]["name"], "probability": 100.0 if i == champion else 0.0} for i in ranking]
-    rng = random.Random(league_id)
-    wins = [0] * len(teams)
-    trials = 10000
-    for _ in range(trials):
-        points = [team["points"] for team in teams]
-        goal_diff = [team["gd"] for team in teams]
-        goals_for = [team["gf"] for team in teams]
-        for home, away, home_rate, away_rate in remaining:
-            hg, ag = _poisson(home_rate, rng), _poisson(away_rate, rng)
-            goal_diff[home] += hg - ag
-            goal_diff[away] += ag - hg
-            goals_for[home] += hg
-            goals_for[away] += ag
-            if hg > ag:
-                points[home] += 3
-            elif hg < ag:
-                points[away] += 3
-            else:
-                points[home] += 1
-                points[away] += 1
-        winner = max(range(len(teams)), key=lambda i: (points[i], goal_diff[i], goals_for[i]))
-        wins[winner] += 1
-    ranking = sorted(range(len(teams)), key=lambda i: (-wins[i], -teams[i]["points"], -teams[i]["gd"]))[:3]
-    return [{"id": teams[i]["id"], "name": teams[i]["name"], "probability": round(wins[i] * 100 / trials, 1)} for i in ranking]
+def footyntel_json(url: str) -> dict:
+    request = Request(url, headers={
+        "User-Agent": "FutbolCentral/1.0 (https://github.com/P1X3L4118/prueba)",
+        "Accept": "application/json",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.7",
+    })
+    with urlopen(request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def fetch_footyntel_title_odds(config: dict, standings: list[dict]) -> tuple[list[dict], dict | None]:
+    feed = FOOTYNTEL.get(config["id"])
+    if not feed:
+        return [], None
+    code, page = feed
+    page_url = f"https://www.footyntel.com/{page}/"
+    try:
+        data = footyntel_json(f"https://www.footyntel.com/data/sim/{code}.json")
+        source_teams = {str(team.get("id")): team for team in data.get("teams", [])}
+        fotmob_teams = {club_key(row.get("name", "")): row for row in standings}
+        rows = []
+        for forecast in data.get("projection", []):
+            source_team = source_teams.get(str(forecast.get("id")))
+            if not source_team:
+                continue
+            external_name = source_team.get("name", "")
+            local_team = fotmob_teams.get(club_key(external_name))
+            if not local_team:
+                print(f"Footyntel: no se encontrÃ³ equipo de FotMob para {config['name']}: {external_name}")
+            probability = max(0.0, min(100.0, float(forecast.get("title", 0) or 0)))
+            rows.append({
+                "id": local_team.get("id") if local_team else None,
+                "name": (local_team.get("shortName") or local_team.get("name")) if local_team else external_name,
+                "probability": round(probability, 1),
+                "_rank": int(local_team.get("rank", 999)) if local_team else 999,
+            })
+        rows.sort(key=lambda row: (-row["probability"], row["_rank"]))
+        for row in rows:
+            row.pop("_rank", None)
+        source = {
+            "name": "Footyntel",
+            "url": page_url,
+            "updatedAt": data.get("updated"),
+            "simulations": data.get("simulations"),
+            "license": "CC BY 4.0",
+        }
+        return rows[:3], source
+    except Exception as error:
+        print(f"Footyntel: no se pudieron actualizar las predicciones de {config['name']}: {error}")
+        return [], None
 
 
 def fetch_all_data(force: bool = False) -> dict:
@@ -263,7 +266,7 @@ def fetch_all_data(force: bool = False) -> dict:
         fixtures = [item for raw in fixtures_data.get("allMatches", []) if (item := normalize_match(raw))]
         standings, legend = normalize_standings(payload)
         scorers, assists = normalize_player_stats(payload)
-        title_odds = estimate_title_odds(config["id"], standings, fixtures)
+        title_odds, title_odds_source = fetch_footyntel_title_odds(config, standings)
         result_leagues.append({
             **config,
             "logo": f"https://images.fotmob.com/image_resources/logo/leaguelogo/{config['id']}.png",
@@ -273,6 +276,7 @@ def fetch_all_data(force: bool = False) -> dict:
             "scorers": scorers,
             "assists": assists,
             "titleOdds": title_odds,
+            "titleOddsSource": title_odds_source,
         })
     result = {
         "updatedAt": datetime.now(MADRID).isoformat(timespec="seconds"),
