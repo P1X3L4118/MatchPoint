@@ -80,7 +80,9 @@ def normalize_match(match: dict) -> dict | None:
     reason_long = str(reason.get("long") or reason_short)
     cancelled = bool(status.get("cancelled"))
     reason_key = f"{reason_short} {reason_long}".casefold()
-    if "suspend" in reason_key:
+    if "abandon" in reason_key:
+        match_state = "abandoned"
+    elif "suspend" in reason_key:
         match_state = "suspended"
     elif ("postpon" in reason_key or "aplaz" in reason_key) and not status.get("started"):
         match_state = "postponed"
@@ -112,6 +114,7 @@ def normalize_match(match: dict) -> dict | None:
         "homeScore": home_score if has_score else None,
         "awayScore": away_score if has_score else None,
         "status": match_state,
+        "awarded": bool(status.get("awarded")),
         "statusText": reason_long,
         "cancellationReason": reason_long if match_state in ("cancelled", "postponed", "suspended") else "",
     }
