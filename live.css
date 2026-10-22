@@ -66,3 +66,10 @@ html[data-theme="light"] .home-nav{color:#47564b}html[data-theme="light"] .home-
 @media(max-width:700px){.home-upcoming-grid{grid-template-columns:1fr}.home-summary{gap:7px}.home-summary-card{padding:11px 9px;gap:8px}.home-summary-copy b{font-size:16px}.home-summary-copy small{font-size:7px}.home-leaders-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.home-view{padding-top:18px;gap:21px}.home-hero{min-height:180px;padding:23px 19px}.home-logo{width:78px;height:78px;border-radius:18px}.home-hero p{font-size:11px}.home-cta{margin-top:15px}.home-featured-grid{grid-template-columns:1fr}.home-live-tag{font-size:7px}.home-section-note{font-size:8px}.home-summary-card{display:grid;justify-items:center;text-align:center;padding:9px 5px}.home-summary-icon{width:30px;height:30px}.home-summary-copy b{font-size:15px}.home-summary-copy small{font-size:6px}.home-leaders-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+
+
+/* Keep highlighted results within their grid row and stop hover overlap. */
+.home-featured-grid{align-items:start;grid-auto-rows:max-content}
+.home-featured-card{align-self:start;display:grid;align-content:start;min-height:0}
+.home-featured-card .match-card{height:auto;min-height:0}
+.home-featured-card .match-card:hover{transform:none}
