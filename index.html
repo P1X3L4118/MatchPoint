@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#07130f">
-  <meta name="description" content="Marcadores de fútbol de hoy, actualizados automáticamente.">
-  <title>Fútbol Central · Marcadores en directo</title>
+  <meta name="theme-color" content="#08120e">
+  <meta name="description" content="Partidos, clasificaciones y estadísticas de las grandes ligas europeas.">
+  <title>Fútbol Central · Ligas europeas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -13,23 +13,47 @@
   <script src="live.js" defer></script>
 </head>
 <body>
-  <main class="page-shell">
-    <header class="topbar">
-      <a class="brand" href="./"><span class="brand-mark">FC</span><span>fútbol<span class="brand-light">central</span></span></a>
-      <div class="top-meta"><span class="live-pulse"></span> MARCADORES DEL DÍA</div>
-    </header>
-    <section class="hero">
-      <div><p class="eyebrow">EL FÚTBOL, AL MOMENTO</p><h1>Partidos de <em>hoy.</em></h1><p class="subtitle">Resultados, horarios y estado de cada encuentro en una sola vista.</p></div>
-      <div class="date-card"><span>FECHA</span><strong id="today-date">—</strong></div>
-    </section>
-    <section class="toolbar">
-      <div class="filters" id="league-filters" aria-label="Filtrar por competición"></div>
-      <div class="refresh"><span id="updated-at">Conectando…</span><button id="refresh" type="button" aria-label="Actualizar partidos">↻ <span>Actualizar</span></button></div>
-    </section>
-    <div id="message" class="message" role="status" aria-live="polite">Cargando partidos…</div>
-    <section id="match-list" class="match-list" aria-live="polite"></section>
-    <footer>Datos deportivos: FotMob · Fuente no oficial · La actualización puede depender de la disponibilidad del servicio.</footer>
-  </main>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="./" aria-label="Fútbol Central, inicio"><span class="brand-mark">FC</span><span>fútbol<span class="brand-light">central</span></span></a>
+      <p class="sidebar-label">LIGAS</p>
+      <nav id="league-nav" class="league-nav" aria-label="Elige una liga"></nav>
+      <div class="sidebar-source"><span class="source-dot"></span><span>Datos de FotMob</span><small>ACTUALIZACIÓN AUTOMÁTICA</small></div>
+    </aside>
+    <main class="main-content">
+      <header class="topbar">
+        <div class="breadcrumb">FÚTBOL <span>/</span> <b id="crumb-league">LALIGA</b></div>
+        <div class="top-actions"><span class="live-indicator"><i></i> EN DIRECTO</span><span id="updated-at">Cargando datos…</span><button id="refresh" class="refresh-button" type="button" aria-label="Actualizar datos">↻ <span>Actualizar</span></button></div>
+      </header>
+      <section class="league-hero">
+        <div class="league-title-wrap"><img id="league-logo" class="main-league-logo" alt=""><div><p class="eyebrow" id="league-country">ESPAÑA · PRIMERA DIVISIÓN</p><h1 id="league-title">LaLiga</h1></div></div>
+        <div class="season-chip">TEMPORADA <b id="season-label">—</b></div>
+      </section>
+      <div id="message" class="message" role="status" aria-live="polite">Cargando calendario y clasificación…</div>
+      <section class="date-toolbar" aria-label="Seleccionar fecha">
+        <div class="date-heading"><span class="section-kicker">CALENDARIO</span><h2 id="selected-date-label">Partidos</h2></div>
+        <div class="date-controls"><button id="prev-day" class="date-arrow" type="button" aria-label="Día anterior">←</button><button id="today-button" class="today-button" type="button">Hoy</button><input id="match-date" type="date" aria-label="Elige una fecha"><button id="next-day" class="date-arrow" type="button" aria-label="Día siguiente">→</button></div>
+      </section>
+      <div class="dashboard-grid">
+        <section class="matches-panel panel">
+          <div class="panel-heading"><div><span class="section-kicker" id="match-league-kicker">LALIGA</span><h2>Partidos del día</h2></div><span id="match-count" class="count-pill">—</span></div>
+          <div id="match-list" class="match-list" aria-live="polite"></div>
+        </section>
+        <section class="standings-panel panel">
+          <div class="panel-heading"><div><span class="section-kicker">CLASIFICACIÓN</span><h2>Tabla completa</h2></div><span id="table-season" class="table-season"></span></div>
+          <div class="standings-scroll"><div class="table-head"><span>#</span><span>Club</span><span>PJ</span><span>DG</span><span>Pts</span></div><div id="standings"></div></div>
+          <div id="zone-legend" class="zone-legend"></div>
+        </section>
+      </div>
+      <section class="stats-section">
+        <div class="section-title"><div><span class="section-kicker">TEMPORADA</span><h2>Los nombres propios</h2></div><span>Máximos goleadores y asistentes</span></div>
+        <div class="stats-grid">
+          <article class="leader-card panel"><div class="leader-heading"><div class="stat-icon goal-icon">⚽</div><div><span class="section-kicker">GOLES</span><h3>Máximos goleadores</h3></div></div><div id="top-scorers" class="leaders-list"></div></article>
+          <article class="leader-card panel"><div class="leader-heading"><div class="stat-icon assist-icon">✦</div><div><span class="section-kicker">ASISTENCIAS</span><h3>Máximos asistentes</h3></div></div><div id="top-assists" class="leaders-list"></div></article>
+        </div>
+      </section>
+      <footer>Resultados, tablas y estadísticas: FotMob · Datos de un servicio no oficial; pueden cambiar si el proveedor modifica su API.</footer>
+    </main>
+  </div>
 </body>
 </html>
-
