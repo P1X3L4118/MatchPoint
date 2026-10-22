@@ -38,7 +38,7 @@ def fotmob_json(url: str) -> dict | list:
     try:
         with urlopen(request, timeout=25) as response:
             body = response.read()
-            if body.startswith(b"\\x1f\\x8b"):
+            if body.startswith(b"\x1f\x8b"):
                 body = gzip.decompress(body)
             return json.loads(body.decode("utf-8"))
     except HTTPError as error:
