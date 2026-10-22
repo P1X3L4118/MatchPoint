@@ -42,3 +42,5 @@ html[data-theme="light"] .theme-toggle .moon-icon,html[data-theme="light"] .them
 
 /* Keep the source note and theme control at the bottom edge of the desktop rail. */
 .sidebar-footer{position:absolute;left:17px;right:17px;bottom:18px;margin:0;display:flex;flex-direction:column;align-items:flex-start;gap:10px}.sidebar-footer .sidebar-source{order:0;width:100%;margin:0}.sidebar-footer .theme-toggle{order:1;margin:0 0 0 7px}.sidebar{padding-bottom:18px}@media(max-width:620px){.sidebar-footer{position:static;margin-top:12px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}.sidebar-footer .theme-toggle{margin:0}.sidebar-footer .sidebar-source{display:none}}
+
+.title-odds-note a{color:var(--green);text-decoration:none}.title-odds-note a:hover{text-decoration:underline}
