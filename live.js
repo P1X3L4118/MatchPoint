@@ -83,9 +83,11 @@ function zoneFor(league, row) {
   for (const zone of league.legend || []) {
     if (!(zone.indices || []).map(Number).includes(position)) continue;
     const title = zone.title.toLocaleLowerCase("es-ES");
+    if (title.includes("champions") && title.includes("qualification")) return { label: "Champions (previa)", key: "champions-qualifier", color: zone.color };
     if (title.includes("champions")) return { label: "Champions", key: "champions", color: zone.color };
     if (title.includes("conference")) return { label: "Conference", key: "conference", color: zone.color };
     if (title.includes("europa")) return { label: "Europa League", key: "europa", color: zone.color };
+    if ((title.includes("relegation") || title.includes("descenso")) && title.includes("qualification")) return { label: "Play-off descenso", key: "playoff", color: zone.color };
     if (title.includes("relegation") || title.includes("descenso")) return { label: "Descenso", key: "relegation", color: zone.color };
   }
   return { label: "", key: "", color: "" };
@@ -110,7 +112,7 @@ function renderStandings(league) {
     return `<div class="standing-row ${zone.key ? `zone-${zone.key}` : ""} ${leader ? "is-leader" : ""}" style="--zone-color:${esc(markerColor)}" title="${esc(label || "")}"><span class="rank-cell">${esc(row.rank)}</span><span class="standing-club">${teamImage(row.id, row.name, true)}<span>${esc(row.shortName || row.name)}</span></span><span>${esc(row.played)}</span><span class="goal-diff ${Number(row.gd) > 0 ? "positive" : Number(row.gd) < 0 ? "negative" : ""}">${Number(row.gd) > 0 ? "+" : ""}${esc(row.gd)}</span><b class="points-cell">${esc(row.points)}</b></div>`;
   }).join("");
   $("#standings").innerHTML = html;
-  const order = ["champions", "conference", "europa", "relegation"];
+  const order = ["champions", "champions-qualifier", "conference", "europa", "playoff", "relegation"];
   const entries = order.map((key) => categories.get(key)).filter(Boolean);
   const leaderLegend = `<span><i style="--zone-color:#f1c84b"></i>Líder</span>`;
   $("#zone-legend").innerHTML = leaderLegend + entries.map((zone) => `<span><i style="--zone-color:${esc(zone.color || "#65756b")}"></i>${esc(zone.label)}</span>`).join("");
