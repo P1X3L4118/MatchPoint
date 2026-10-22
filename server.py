@@ -133,9 +133,9 @@ def normalize_player_stats(payload: dict) -> tuple[list[dict], list[dict]]:
     scorers, assists = [], []
     for stat in stats.get("players") or []:
         header = str(stat.get("header") or "").casefold()
-        if "scorer" in header or "goleador" in header or header == "goals":
+        if "scorer" in header or "goleador" in header or header in ("goals", "top scorer"):
             target = scorers
-        elif "assist" in header or "asistencia" in header:
+        elif header in ("assist", "assists", "asistencia", "asistencias"):
             target = assists
         else:
             continue
@@ -148,9 +148,9 @@ def normalize_player_stats(payload: dict) -> tuple[list[dict], list[dict]]:
                 complete = next((item.get("StatList") for item in top_lists if item.get("StatList")), [])
                 if complete:
                     players = complete[:5]
-            except Exception:
+            except Exception as error:
                 # Conserva los líderes del endpoint principal si falla la lista ampliada.
-                pass
+                print(f"FotMob: no se pudo ampliar {header}: {error}")
         for player in players[:5]:
             player_id = player.get("id") or player.get("ParticipantId") or player.get("ParticiantId")
             name = player.get("name") or player.get("ParticipantName", "")
