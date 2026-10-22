@@ -315,7 +315,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", 8000), Handler)
-    print("Fútbol Central: http://127.0.0.1:8000")
+    print("MatchPoint: http://127.0.0.1:8000")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
