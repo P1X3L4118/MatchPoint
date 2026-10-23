@@ -18,11 +18,11 @@ Requiere Python 3.10 o posterior. Ejecuta:
 python server.py
 ```
 
-Abre <http://127.0.0.1:8000>. El servidor obtiene y guarda en memoria cinco minutos de datos para cada liga desde FotMob. El calendario de temporada permite consultar fechas anteriores y futuras incluidas por FotMob. El navegador refresca los datos cada minuto; el botón «Actualizar» permite solicitar una carga inmediata.
+Abre <http://127.0.0.1:8000>. El servidor obtiene y guarda en memoria cinco minutos de datos para cada liga desde FotMob. El calendario de temporada permite consultar fechas anteriores y futuras incluidas por FotMob. En la página publicada, los marcadores y estados de los partidos de hoy se consultan directamente a FotMob cada 15 segundos; el resto de los datos se refresca cada minuto. El botón «Actualizar» permite solicitar una carga inmediata.
 
 ## Publicación en GitHub Pages
 
-El workflow `.github/workflows/pages.yml` actualiza `data/football.json` desde FotMob cada cinco minutos y despliega el sitio. En GitHub, la fuente de Pages debe estar configurada como **GitHub Actions**. El sitio público es <https://p1x3l4118.github.io/prueba/>.
+El workflow `.github/workflows/pages.yml` actualiza `data/football.json` desde FotMob cada cinco minutos y despliega el sitio. Los marcadores en directo no dependen de ese archivo: el navegador consulta el endpoint público de partidos de FotMob cada 15 segundos. En GitHub, la fuente de Pages debe estar configurada como **GitHub Actions**. El sitio público es <https://p1x3l4118.github.io/prueba/>.
 
 ## Archivos
 
