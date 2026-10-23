@@ -302,5 +302,5 @@ $("#match-date").addEventListener("change", (event) => { if (event.target.value)
 $("#refresh").addEventListener("click", refresh);
 renderHome();
 refresh();
-setInterval(refresh, 60_000);
+setInterval(refresh, 15_000);
 
