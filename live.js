@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const LEAGUE_ORDER = [87, 47, 55, 54, 53];
-const state = { data: null, leagueId: Number(localStorage.getItem("fc-league")) || 87, date: madridDate(), loading: false, view: "home" };
+const state = { data: null, leagueId: Number(localStorage.getItem("fc-league")) || 87, date: madridDate(), loading: false, view: "home", liveLoading: false };
 
 function madridDate(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
@@ -285,6 +285,56 @@ async function refresh() {
   }
 }
 
+async function refreshLiveScores() {
+  if (state.liveLoading || !state.data?.leagues?.length) return;
+  state.liveLoading = true;
+  try {
+    const day = madridDate().replaceAll("-", "");
+    const response = await fetch(`https://www.fotmob.com/api/data/matches?date=${day}&ts=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`FotMob HTTP ${response.status}`);
+    const payload = await response.json();
+    const byId = new Map();
+    for (const group of payload.leagues || []) {
+      const league = state.data.leagues.find((item) => Number(item.id) === Number(group.id));
+      if (!league) continue;
+      const matchesById = new Map((league.matches || []).map((match) => [String(match.id), match]));
+      for (const liveMatch of group.matches || []) {
+        const match = matchesById.get(String(liveMatch.id));
+        if (match) byId.set(String(match.id), { match, liveMatch });
+      }
+    }
+    let changed = false;
+    for (const { match, liveMatch } of byId.values()) {
+      const status = liveMatch.status || {};
+      const reason = status.reason || {};
+      const reasonText = `${reason.short || ""} ${reason.long || ""}`.trim();
+      const reasonLower = reasonText.toLocaleLowerCase("es");
+      let nextStatus = "scheduled";
+      if (/suspend/.test(reasonLower)) nextStatus = "suspended";
+      else if (/postpon|aplaz/.test(reasonLower) && !status.started) nextStatus = "postponed";
+      else if (status.cancelled) nextStatus = "cancelled";
+      else if (status.finished || status.awarded) nextStatus = "finished";
+      else if (status.started) nextStatus = "live";
+      const hasScore = Boolean(status.started || status.finished || status.awarded);
+      const homeScore = hasScore && liveMatch.home?.score != null ? Number(liveMatch.home.score) : null;
+      const awayScore = hasScore && liveMatch.away?.score != null ? Number(liveMatch.away.score) : null;
+      const nextStatusText = reason.long || reason.short || (nextStatus === "finished" ? "Tiempo completo" : nextStatus === "live" ? "Partido en curso" : "");
+      if (match.status !== nextStatus || match.homeScore !== homeScore || match.awayScore !== awayScore || match.statusText !== nextStatusText) changed = true;
+      match.status = nextStatus;
+      match.homeScore = homeScore;
+      match.awayScore = awayScore;
+      match.statusText = nextStatusText;
+      match.cancellationReason = ["cancelled", "postponed", "suspended"].includes(nextStatus) ? (reason.long || reason.short || "FotMob no indica el motivo del cambio de estado.") : "";
+    }
+    if (changed) renderAll();
+  } catch (error) {
+    // Conserva los últimos datos disponibles si FotMob no responde temporalmente.
+    console.warn("No se pudieron refrescar los marcadores en directo:", error);
+  } finally {
+    state.liveLoading = false;
+  }
+}
+
 $("#prev-day").addEventListener("click", () => {
   const date = new Date(`${state.date}T12:00:00`);
   date.setDate(date.getDate() - 1);
@@ -302,5 +352,7 @@ $("#match-date").addEventListener("change", (event) => { if (event.target.value)
 $("#refresh").addEventListener("click", refresh);
 renderHome();
 refresh();
-setInterval(refresh, 15_000);
+setInterval(refresh, 60_000);
+setInterval(refreshLiveScores, 15_000);
+setTimeout(refreshLiveScores, 1_000);
 
