@@ -73,3 +73,6 @@ html[data-theme="light"] .home-nav{color:#47564b}html[data-theme="light"] .home-
 .home-featured-card{align-self:start;display:grid;align-content:start;min-height:0}
 .home-featured-card .match-card{height:auto;min-height:0}
 .home-featured-card .match-card:hover{transform:none}
+
+
+.sidebar-controls{display:flex;align-items:center;gap:10px;margin-left:7px}.sidebar-footer .theme-toggle{margin:0}.app-version{color:var(--muted);font-size:9px;font-weight:600;letter-spacing:.12em;opacity:.8}
